@@ -1,0 +1,844 @@
+/* eslint-disable react-refresh/only-export-components */
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type PropsWithChildren,
+} from 'react'
+import {
+  createDemoExportArtifacts,
+  createExportArtifact,
+  createInitialDemoState,
+  getDefaultSectionId,
+  getDemoDraftFields,
+  getDemoDraftIssues,
+  getDemoDraftSections,
+  getDemoDraftSources,
+  getDemoMaterials,
+  getDemoMeasurements,
+  getDemoNeedText,
+  getDemoNotes,
+  getDemoSourceOptions,
+  getRunStageBlueprints,
+  totalRunDurationMs,
+} from '../data/demoData'
+import type {
+  DemoDocumentType,
+  DemoPageKey,
+  DemoState,
+  DemoWorkflowStageId,
+  ExportFormat,
+  QAFlag,
+  RecentOperation,
+} from '../types/demo'
+
+const storageKey = 'nuoperator-demo-state-v3'
+
+interface DemoContextValue {
+  state: DemoState
+  startPipeline: (branch: DemoDocumentType, pipelineName: string) => void
+  applyDemoVariant: (pageKey: DemoPageKey) => void
+  startRun: (runId: string, branch: DemoDocumentType) => void
+  skipRun: (branch: DemoDocumentType) => void
+  completeRun: (branch: DemoDocumentType) => void
+  updateField: (fieldId: DemoState['draft']['fields'][number]['id'], value: string) => void
+  selectDocumentType: (documentType: DemoDocumentType) => void
+  selectSection: (sectionId: string) => void
+  focusIssue: (issue: QAFlag) => void
+  openSectionFromSource: (sectionId: string) => void
+  registerExport: (format: ExportFormat, branch: DemoDocumentType) => void
+  closeExportPreview: () => void
+  sendForSignature: (branch: DemoDocumentType) => void
+  setBranchStage: (branch: DemoDocumentType, stageId: DemoWorkflowStageId) => void
+  markStageComplete: (branch: DemoDocumentType, stageId: DemoWorkflowStageId) => void
+  selectSourceKp: (caseId: string | null) => void
+  updateRequestSummary: (branch: DemoDocumentType, value: string) => void
+  updateStageNotes: (branch: DemoDocumentType, value: string) => void
+  updateMeasurement: (measurementId: string, value: string) => void
+  resetDemo: () => void
+}
+
+const DemoContext = createContext<DemoContextValue | null>(null)
+
+function loadState() {
+  if (typeof window === 'undefined') {
+    return createInitialDemoState()
+  }
+
+  const cached = window.localStorage.getItem(storageKey)
+  if (!cached) {
+    return createInitialDemoState()
+  }
+
+  try {
+    return JSON.parse(cached) as DemoState
+  } catch {
+    return createInitialDemoState()
+  }
+}
+
+function createOperation(branch: DemoDocumentType, title: string, description: string): RecentOperation {
+  const timestamp = new Date().toISOString()
+
+  return {
+    id: `operation-${timestamp}-${Math.random().toString(36).slice(2, 8)}`,
+    branch,
+    title,
+    description,
+    createdAt: timestamp,
+  }
+}
+
+function appendOperation(state: DemoState, operation: RecentOperation) {
+  return [operation, ...state.recentOperations].slice(0, 8)
+}
+
+function getPageBranch(pageKey: DemoPageKey): DemoDocumentType {
+  return pageKey.startsWith('kp-') ? 'kp' : 'tz'
+}
+
+function stripBranchDemoFlags(state: DemoState, branch: DemoDocumentType) {
+  const nextFlags = { ...state.demoAppliedByPage }
+
+  Object.keys(nextFlags).forEach((key) => {
+    if (key.startsWith(`${branch}-`)) {
+      delete nextFlags[key as DemoPageKey]
+    }
+  })
+
+  return nextFlags
+}
+
+function buildDraftDemo(branch: DemoDocumentType, pipelineName: string) {
+  return {
+    documentType: branch,
+    fields: getDemoDraftFields(),
+    sections: getDemoDraftSections(branch, pipelineName),
+    issues: getDemoDraftIssues(branch),
+    sources: getDemoDraftSources(branch),
+    approvalState: 'ready' as const,
+  }
+}
+
+export function DemoProvider({ children }: PropsWithChildren) {
+  const [state, setState] = useState<DemoState>(loadState)
+
+  useEffect(() => {
+    window.localStorage.setItem(storageKey, JSON.stringify(state))
+  }, [state])
+
+  const startPipeline = useCallback((branch: DemoDocumentType, pipelineName: string) => {
+    const trimmedName = pipelineName.trim()
+
+    if (!trimmedName) {
+      return
+    }
+
+    setState((current) => {
+      const demoCase = current.cases[0]
+      if (!demoCase) {
+        return current
+      }
+
+      const clearedDemoFlags = stripBranchDemoFlags(current, branch)
+      const resetCase =
+        branch === 'kp'
+          ? {
+              ...demoCase,
+              kpRequestSummary: '',
+              kpContextNotes: '',
+              kpMaterials: [],
+            }
+          : {
+              ...demoCase,
+              tzRequestSummary: '',
+              tzTechnicalNotes: '',
+              tzMeasurements: [],
+            }
+
+      return {
+        ...current,
+        cases: [resetCase],
+        selectedDocumentType: branch,
+        selectedSectionId: getDefaultSectionId(branch),
+        selectedSourceKpId: branch === 'tz' ? null : current.selectedSourceKpId,
+        draft: {
+          ...current.draft,
+          documentType: branch,
+          fields: current.draft.fields.map((field) => ({ ...field, value: '' })),
+          sections: [],
+          issues: [],
+          sources: [],
+          approvalState: 'needs_review',
+        },
+        run: {
+          ...current.run,
+          status: 'idle',
+          startedAt: null,
+          completedAt: null,
+          stages: getRunStageBlueprints(branch),
+        },
+        exportArtifacts: [],
+        previewArtifact: null,
+        approvalSent: false,
+        focusedIssueId: null,
+        branchLaunch: {
+          ...current.branchLaunch,
+          [branch]: {
+            started: true,
+            pipelineName: trimmedName,
+          },
+        },
+        demoAppliedByPage: clearedDemoFlags,
+        currentBranchStage: {
+          ...current.currentBranchStage,
+          [branch]: branch === 'kp' ? 'need' : 'source',
+        },
+        branchProgress: {
+          ...current.branchProgress,
+          [branch]: {
+            currentStageId: branch === 'kp' ? 'need' : 'source',
+            completedStageIds: [],
+          },
+        },
+        recentOperations: appendOperation(
+          current,
+          createOperation(
+            branch,
+            'Пайплайн запущен',
+            `Создан новый сценарий работы с названием «${trimmedName}».`,
+          ),
+        ),
+      }
+    })
+  }, [])
+
+  const applyDemoVariant = useCallback((pageKey: DemoPageKey) => {
+    const branch = getPageBranch(pageKey)
+
+    setState((current) => {
+      const demoCase = current.cases[0]
+      if (!demoCase) {
+        return current
+      }
+
+      const pipelineName =
+        current.branchLaunch[branch].pipelineName || (branch === 'kp' ? 'Коммерческий пайплайн' : 'Технический пайплайн')
+
+      let nextCase = demoCase
+      let nextDraft = current.draft
+      let nextRun = current.run
+      let nextSelectedSourceKpId = current.selectedSourceKpId
+      let nextExportArtifacts = current.exportArtifacts
+      let title = 'Подключён демонстрационный вариант'
+      let description = 'Для текущего шага применены демонстрационные данные.'
+
+      switch (pageKey) {
+        case 'kp-need':
+          nextCase = {
+            ...demoCase,
+            kpRequestSummary: getDemoNeedText('kp', pipelineName),
+          }
+          title = 'Демо для этапа потребности'
+          description = 'Заполнен пример текста для базовой потребности заказчика.'
+          break
+        case 'kp-materials':
+          nextCase = {
+            ...demoCase,
+            kpMaterials: getDemoMaterials(),
+          }
+          title = 'Демо для материалов'
+          description = 'Добавлен обезличенный набор материалов для демонстрации.'
+          break
+        case 'kp-comments':
+          nextCase = {
+            ...demoCase,
+            kpContextNotes: getDemoNotes('kp'),
+          }
+          title = 'Демо для вводных'
+          description = 'Заполнен пример свободных вводных для генерации КП.'
+          break
+        case 'tz-source':
+          nextSelectedSourceKpId = getDemoSourceOptions()[0]?.id ?? null
+          title = 'Демо для основы ТЗ'
+          description = 'Открыты обезличенные варианты базового КП для демонстрации.'
+          break
+        case 'tz-need':
+          nextCase = {
+            ...demoCase,
+            tzRequestSummary: getDemoNeedText('tz', pipelineName),
+          }
+          title = 'Демо для технической цели'
+          description = 'Заполнен пример текста для адаптации задачи под ТЗ.'
+          break
+        case 'tz-comments':
+          nextCase = {
+            ...demoCase,
+            tzTechnicalNotes: getDemoNotes('tz'),
+            tzMeasurements: getDemoMeasurements(),
+          }
+          title = 'Демо для технических вводных'
+          description = 'Добавлены контрольные параметры и свободные технические вводные.'
+          break
+        case 'kp-draft':
+        case 'tz-draft':
+          nextDraft = {
+            ...nextDraft,
+            ...buildDraftDemo(branch, pipelineName),
+          }
+          title = branch === 'kp' ? 'Демо для редактора КП' : 'Демо для редактора ТЗ'
+          description = 'Подготовлен обезличенный черновик для показа в редакторе.'
+          break
+        case 'kp-approve':
+        case 'tz-approve':
+          nextDraft = {
+            ...nextDraft,
+            ...buildDraftDemo(branch, pipelineName),
+          }
+          nextExportArtifacts =
+            current.exportArtifacts.length > 0 ? current.exportArtifacts : createDemoExportArtifacts()
+          title = branch === 'kp' ? 'Демо для согласования КП' : 'Демо для согласования ТЗ'
+          description = 'Подготовлен пример итогового экрана согласования и истории экспорта.'
+          break
+        case 'kp-run':
+        case 'tz-run':
+          nextRun = {
+            ...current.run,
+            status: 'idle',
+            startedAt: null,
+            completedAt: null,
+            stages: getRunStageBlueprints(branch),
+          }
+          title = branch === 'kp' ? 'Демо для сборки КП' : 'Демо для сборки ТЗ'
+          description = 'Подготовлен демонстрационный сценарий для экрана сборки.'
+          break
+      }
+
+      return {
+        ...current,
+        cases: [nextCase],
+        draft: nextDraft,
+        run: nextRun,
+        selectedDocumentType: branch,
+        selectedSectionId: getDefaultSectionId(branch),
+        selectedSourceKpId: nextSelectedSourceKpId,
+        exportArtifacts: nextExportArtifacts,
+        demoAppliedByPage: {
+          ...current.demoAppliedByPage,
+          [pageKey]: true,
+        },
+        recentOperations: appendOperation(current, createOperation(branch, title, description)),
+      }
+    })
+  }, [])
+
+  const startRun = useCallback((runId: string, branch: DemoDocumentType) => {
+    setState((current) => {
+      if (current.run.id !== runId) {
+        return current
+      }
+
+      return {
+        ...current,
+        selectedDocumentType: branch,
+        selectedSectionId: getDefaultSectionId(branch),
+        run: {
+          ...current.run,
+          status: 'running',
+          startedAt: current.run.status === 'running' ? current.run.startedAt : Date.now(),
+          completedAt: null,
+          stages: getRunStageBlueprints(branch),
+        },
+        currentBranchStage: {
+          ...current.currentBranchStage,
+          [branch]: 'run',
+        },
+        branchProgress: {
+          ...current.branchProgress,
+          [branch]: {
+            currentStageId: 'run',
+            completedStageIds: Array.from(new Set([...current.branchProgress[branch].completedStageIds])),
+          },
+        },
+        focusedIssueId: null,
+        previewArtifact: null,
+        recentOperations: appendOperation(
+          current,
+          createOperation(
+            branch,
+            branch === 'kp' ? 'Запущена сборка КП' : 'Запущена сборка ТЗ',
+            branch === 'kp'
+              ? 'Система начала демонстрационную сборку коммерческого предложения.'
+              : 'Система начала демонстрационную сборку технического задания.',
+          ),
+        ),
+      }
+    })
+  }, [])
+
+  const skipRun = useCallback((branch: DemoDocumentType) => {
+    setState((current) => ({
+      ...current,
+      selectedDocumentType: branch,
+      run: {
+        ...current.run,
+        status: 'completed',
+        startedAt: Date.now() - totalRunDurationMs,
+        completedAt: Date.now(),
+        stages: getRunStageBlueprints(branch),
+      },
+      draft: {
+        ...current.draft,
+        approvalState: 'ready',
+        documentType: branch,
+      },
+      currentBranchStage: {
+        ...current.currentBranchStage,
+        [branch]: 'editor',
+      },
+      branchProgress: {
+        ...current.branchProgress,
+        [branch]: {
+          currentStageId: 'editor',
+          completedStageIds: Array.from(
+            new Set([...current.branchProgress[branch].completedStageIds, 'run']),
+          ),
+        },
+      },
+      recentOperations: appendOperation(
+        current,
+        createOperation(
+          branch,
+          'Сборка завершена досрочно',
+          'Анимация пропущена, рабочий документ переведён в режим редактора.',
+        ),
+      ),
+    }))
+  }, [])
+
+  const completeRun = useCallback((branch: DemoDocumentType) => {
+    setState((current) => {
+      if (current.run.status === 'completed') {
+        return current
+      }
+
+      return {
+        ...current,
+        selectedDocumentType: branch,
+        run: {
+          ...current.run,
+          status: 'completed',
+          completedAt: Date.now(),
+          stages: getRunStageBlueprints(branch),
+        },
+        draft: {
+          ...current.draft,
+          approvalState: 'ready',
+          documentType: branch,
+        },
+        currentBranchStage: {
+          ...current.currentBranchStage,
+          [branch]: 'editor',
+        },
+        branchProgress: {
+          ...current.branchProgress,
+          [branch]: {
+            currentStageId: 'editor',
+            completedStageIds: Array.from(
+              new Set([...current.branchProgress[branch].completedStageIds, 'run']),
+            ),
+          },
+        },
+        recentOperations: appendOperation(
+          current,
+          createOperation(
+            branch,
+            branch === 'kp' ? 'Черновик КП собран' : 'Черновик ТЗ собран',
+            branch === 'kp'
+              ? 'Демонстрационная сборка завершена, можно перейти к редактору КП.'
+              : 'Демонстрационная сборка завершена, можно перейти к редактору ТЗ.',
+          ),
+        ),
+      }
+    })
+  }, [])
+
+  const updateField = useCallback(
+    (fieldId: DemoState['draft']['fields'][number]['id'], value: string) => {
+      setState((current) => {
+        const existingField = current.draft.fields.find((field) => field.id === fieldId)
+        if (!existingField || existingField.value === value) {
+          return current
+        }
+
+        return {
+          ...current,
+          draft: {
+            ...current.draft,
+            fields: current.draft.fields.map((field) =>
+              field.id === fieldId ? { ...field, value } : field,
+            ),
+          },
+        }
+      })
+    },
+    [],
+  )
+
+  const selectDocumentType = useCallback((documentType: DemoDocumentType) => {
+    setState((current) => {
+      const fallbackSection =
+        current.draft.sections.find((section) => section.documentType === documentType)?.id ??
+        getDefaultSectionId(documentType)
+
+      if (
+        current.selectedDocumentType === documentType &&
+        current.draft.documentType === documentType &&
+        current.selectedSectionId === fallbackSection
+      ) {
+        return current
+      }
+
+      return {
+        ...current,
+        selectedDocumentType: documentType,
+        draft: {
+          ...current.draft,
+          documentType,
+        },
+        selectedSectionId: fallbackSection,
+      }
+    })
+  }, [])
+
+  const selectSection = useCallback((sectionId: string) => {
+    setState((current) => {
+      if (current.selectedSectionId === sectionId && current.focusedIssueId === null) {
+        return current
+      }
+
+      return {
+        ...current,
+        selectedSectionId: sectionId,
+        focusedIssueId: null,
+      }
+    })
+  }, [])
+
+  const focusIssue = useCallback((issue: QAFlag) => {
+    setState((current) => {
+      const nextDocumentType =
+        current.draft.sections.find((section) => section.id === issue.relatedSectionId)?.documentType ??
+        current.selectedDocumentType
+
+      if (
+        current.focusedIssueId === issue.id &&
+        current.selectedSectionId === issue.relatedSectionId &&
+        current.selectedDocumentType === nextDocumentType
+      ) {
+        return current
+      }
+
+      return {
+        ...current,
+        focusedIssueId: issue.id,
+        selectedSectionId: issue.relatedSectionId,
+        selectedDocumentType: nextDocumentType,
+      }
+    })
+  }, [])
+
+  const openSectionFromSource = useCallback((sectionId: string) => {
+    setState((current) => {
+      const nextDocumentType =
+        current.draft.sections.find((section) => section.id === sectionId)?.documentType ??
+        current.selectedDocumentType
+
+      if (
+        current.selectedSectionId === sectionId &&
+        current.selectedDocumentType === nextDocumentType &&
+        current.focusedIssueId === null
+      ) {
+        return current
+      }
+
+      return {
+        ...current,
+        selectedSectionId: sectionId,
+        selectedDocumentType: nextDocumentType,
+        focusedIssueId: null,
+      }
+    })
+  }, [])
+
+  const registerExport = useCallback((format: ExportFormat, branch: DemoDocumentType) => {
+    setState((current) => {
+      const artifact = createExportArtifact(format)
+
+      return {
+        ...current,
+        exportArtifacts: [artifact, ...current.exportArtifacts],
+        previewArtifact: artifact,
+        recentOperations: appendOperation(
+          current,
+          createOperation(
+            branch,
+            `Сформирован ${format}`,
+            branch === 'kp'
+              ? `Экспортирован пакет коммерческого предложения в формате ${format}.`
+              : `Экспортирован пакет технического задания в формате ${format}.`,
+          ),
+        ),
+      }
+    })
+  }, [])
+
+  const closeExportPreview = useCallback(() => {
+    setState((current) => {
+      if (current.previewArtifact === null) {
+        return current
+      }
+
+      return {
+        ...current,
+        previewArtifact: null,
+      }
+    })
+  }, [])
+
+  const sendForSignature = useCallback((branch: DemoDocumentType) => {
+    setState((current) => {
+      if (current.approvalSent && current.draft.approvalState === 'approved') {
+        return current
+      }
+
+      return {
+        ...current,
+        approvalSent: true,
+        draft: {
+          ...current.draft,
+          approvalState: 'approved',
+        },
+        recentOperations: appendOperation(
+          current,
+          createOperation(
+            branch,
+            branch === 'kp' ? 'КП отправлено на согласование' : 'ТЗ отправлено на согласование',
+            'Финальный пакет передан дальше без добавления чувствительных данных.',
+          ),
+        ),
+      }
+    })
+  }, [])
+
+  const setBranchStage = useCallback((branch: DemoDocumentType, stageId: DemoWorkflowStageId) => {
+    setState((current) => {
+      if (
+        current.currentBranchStage[branch] === stageId &&
+        current.branchProgress[branch].currentStageId === stageId
+      ) {
+        return current
+      }
+
+      return {
+        ...current,
+        currentBranchStage: {
+          ...current.currentBranchStage,
+          [branch]: stageId,
+        },
+        branchProgress: {
+          ...current.branchProgress,
+          [branch]: {
+            ...current.branchProgress[branch],
+            currentStageId: stageId,
+          },
+        },
+      }
+    })
+  }, [])
+
+  const markStageComplete = useCallback((branch: DemoDocumentType, stageId: DemoWorkflowStageId) => {
+    setState((current) => {
+      if (current.branchProgress[branch].completedStageIds.includes(stageId)) {
+        return current
+      }
+
+      return {
+        ...current,
+        branchProgress: {
+          ...current.branchProgress,
+          [branch]: {
+            ...current.branchProgress[branch],
+            completedStageIds: Array.from(
+              new Set([...current.branchProgress[branch].completedStageIds, stageId]),
+            ),
+          },
+        },
+      }
+    })
+  }, [])
+
+  const selectSourceKp = useCallback((caseId: string | null) => {
+    setState((current) => ({
+      ...current,
+      selectedDocumentType: 'tz',
+      selectedSourceKpId: caseId,
+      selectedSectionId: getDefaultSectionId('tz'),
+      recentOperations: appendOperation(
+        current,
+        createOperation(
+          'tz',
+          caseId ? 'Выбрана демонстрационная основа' : 'ТЗ собирается без основы',
+          caseId
+            ? 'Для сценария ТЗ выбрана нейтральная база из демонстрационного КП.'
+            : 'Сценарий ТЗ продолжает работу без заранее выбранной основы.',
+        ),
+      ),
+    }))
+  }, [])
+
+  const updateRequestSummary = useCallback((branch: DemoDocumentType, value: string) => {
+    setState((current) => {
+      const demoCase = current.cases[0]
+      if (!demoCase) {
+        return current
+      }
+
+      if (branch === 'kp' && demoCase.kpRequestSummary === value) {
+        return current
+      }
+
+      if (branch === 'tz' && demoCase.tzRequestSummary === value) {
+        return current
+      }
+
+      return {
+        ...current,
+        cases: [
+          branch === 'kp'
+            ? { ...demoCase, kpRequestSummary: value }
+            : { ...demoCase, tzRequestSummary: value },
+        ],
+      }
+    })
+  }, [])
+
+  const updateStageNotes = useCallback((branch: DemoDocumentType, value: string) => {
+    setState((current) => {
+      const demoCase = current.cases[0]
+      if (!demoCase) {
+        return current
+      }
+
+      if (branch === 'kp' && demoCase.kpContextNotes === value) {
+        return current
+      }
+
+      if (branch === 'tz' && demoCase.tzTechnicalNotes === value) {
+        return current
+      }
+
+      return {
+        ...current,
+        cases: [
+          branch === 'kp'
+            ? { ...demoCase, kpContextNotes: value }
+            : { ...demoCase, tzTechnicalNotes: value },
+        ],
+      }
+    })
+  }, [])
+
+  const updateMeasurement = useCallback((measurementId: string, value: string) => {
+    setState((current) => {
+      const demoCase = current.cases[0]
+      const targetMeasurement = demoCase?.tzMeasurements.find((measurement) => measurement.id === measurementId)
+
+      if (!demoCase || !targetMeasurement || targetMeasurement.value === value) {
+        return current
+      }
+
+      return {
+        ...current,
+        cases: [
+          {
+            ...demoCase,
+            tzMeasurements: demoCase.tzMeasurements.map((measurement) =>
+              measurement.id === measurementId ? { ...measurement, value } : measurement,
+            ),
+          },
+        ],
+      }
+    })
+  }, [])
+
+  const resetDemo = useCallback(() => {
+    const nextState = createInitialDemoState()
+    window.localStorage.setItem(storageKey, JSON.stringify(nextState))
+    setState(nextState)
+  }, [])
+
+  const value = useMemo<DemoContextValue>(
+    () => ({
+      state,
+      startPipeline,
+      applyDemoVariant,
+      startRun,
+      skipRun,
+      completeRun,
+      updateField,
+      selectDocumentType,
+      selectSection,
+      focusIssue,
+      openSectionFromSource,
+      registerExport,
+      closeExportPreview,
+      sendForSignature,
+      setBranchStage,
+      markStageComplete,
+      selectSourceKp,
+      updateRequestSummary,
+      updateStageNotes,
+      updateMeasurement,
+      resetDemo,
+    }),
+    [
+      state,
+      startPipeline,
+      applyDemoVariant,
+      startRun,
+      skipRun,
+      completeRun,
+      updateField,
+      selectDocumentType,
+      selectSection,
+      focusIssue,
+      openSectionFromSource,
+      registerExport,
+      closeExportPreview,
+      sendForSignature,
+      setBranchStage,
+      markStageComplete,
+      selectSourceKp,
+      updateRequestSummary,
+      updateStageNotes,
+      updateMeasurement,
+      resetDemo,
+    ],
+  )
+
+  return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>
+}
+
+export function useDemo() {
+  const context = useContext(DemoContext)
+
+  if (!context) {
+    throw new Error('useDemo must be used inside DemoProvider')
+  }
+
+  return context
+}

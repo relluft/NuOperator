@@ -1,0 +1,14 @@
+<svg width="640" height="420" viewBox="0 0 640 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="640" height="420" rx="28" fill="#F5EEDF"/>
+  <rect x="62" y="78" width="516" height="262" rx="24" fill="#E7DDD0"/>
+  <rect x="158" y="120" width="324" height="164" rx="20" fill="#FBF7F1"/>
+  <rect x="286" y="140" width="68" height="144" rx="18" fill="#D8E2E8"/>
+  <rect x="258" y="140" width="24" height="144" rx="12" fill="#284C61" opacity="0.18"/>
+  <rect x="358" y="140" width="24" height="144" rx="12" fill="#284C61" opacity="0.18"/>
+  <path d="M110 308H222L314 214H402V236L308 330H110V308Z" fill="#5F8292"/>
+  <path d="M111 306H223L313 216H402" stroke="#284C61" stroke-width="6" stroke-linecap="round"/>
+  <path d="M114 270H170" stroke="#284C61" stroke-width="5" stroke-linecap="round"/>
+  <path d="M124 250H184" stroke="#284C61" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="504" cy="124" r="38" fill="#FFFFFF" fill-opacity="0.45"/>
+  <text x="88" y="365" fill="#284C61" font-family="sans-serif" font-size="24" font-weight="700">Входная группа</text>
+</svg>

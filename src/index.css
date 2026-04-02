@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Onest", "Segoe UI", sans-serif;
+  --font-serif: "IBM Plex Serif", Georgia, serif;
+}
+
+:root {
+  --page-bg: #061018;
+  --page-bg-secondary: #09141d;
+  --page-bg-tertiary: #0d1b28;
+  --surface: rgba(10, 18, 27, 0.76);
+  --surface-strong: rgba(14, 24, 35, 0.92);
+  --surface-muted: rgba(18, 30, 44, 0.78);
+  --surface-dark: #071018;
+  --paper: #0c1824;
+  --paper-line: rgba(135, 163, 186, 0.16);
+  --ink-950: #edf5fb;
+  --ink-800: #c8d6e4;
+  --ink-700: #9db1c3;
+  --ink-500: #6f8498;
+  --brand-700: #9ed7f6;
+  --brand-600: #75c2e8;
+  --brand-500: #4e95bc;
+  --brand-200: rgba(116, 160, 192, 0.24);
+  --border-soft: rgba(132, 162, 186, 0.16);
+  --border-strong: rgba(132, 162, 186, 0.3);
+  --accent-amber-soft: rgba(213, 159, 78, 0.16);
+  --accent-amber-strong: #f0bf72;
+  --shadow-soft:
+    0 28px 90px rgba(2, 8, 14, 0.48),
+    0 12px 28px rgba(2, 8, 14, 0.3);
+  --shadow-paper:
+    0 24px 60px rgba(2, 8, 14, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  color: var(--ink-950);
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(circle at top left, rgba(117, 194, 232, 0.14), transparent 28%),
+    radial-gradient(circle at top right, rgba(213, 159, 78, 0.12), transparent 24%),
+    linear-gradient(180deg, var(--page-bg) 0%, var(--page-bg-secondary) 48%, var(--page-bg-tertiary) 100%);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+textarea {
+  resize: vertical;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+::selection {
+  background: rgba(117, 194, 232, 0.24);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(109, 129, 150, 0.42);
+  border-radius: 999px;
+}
+
+.paper-grid {
+  background-image:
+    linear-gradient(rgba(132, 162, 186, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(132, 162, 186, 0.1) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.document-paper {
+  background:
+    linear-gradient(180deg, rgba(15, 28, 40, 0.98), rgba(10, 20, 29, 0.98)),
+    var(--paper);
+  box-shadow: var(--shadow-paper);
+}
+
+.frosted {
+  background: var(--surface);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow-soft);
+}
