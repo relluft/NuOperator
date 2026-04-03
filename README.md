@@ -7,7 +7,7 @@
 Откройте PowerShell в папке проекта:
 
 ```powershell
-cd c:\Users\Илья\Desktop\NuOperator\frontend
+cd c:\Users\[ИМЯ_ПОЛЬЗОВАТЕЛЯ]\Desktop\NuOperator\frontend
 npm install
 npm run dev
 ```
