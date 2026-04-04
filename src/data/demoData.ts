@@ -1,7 +1,12 @@
 import type {
+  DraftCellAnnotation,
+  DraftCellId,
   DemoAsset,
   DemoDocumentType,
   DemoDraft,
+  DemoOfferTable,
+  DemoOfferTableItem,
+  DemoOfferTableTotal,
   DemoMeasurement,
   DemoRun,
   DemoSourceOption,
@@ -150,15 +155,398 @@ const demoFieldDefaults = {
   specialTerms: 'работы планируются по согласованному окну без раскрытия персональных данных',
 }
 
+const defaultOfferServiceTotals: DemoOfferTableTotal[] = [
+  {
+    id: 'offer-transport',
+    label: 'РўР РђРќРЎРџРћР РўРќР«Р• Р РђРЎРҐРћР”Р«',
+    grandTotal: 83605.29,
+    tone: 'service',
+  },
+  {
+    id: 'offer-setup',
+    label: 'РћР Р“РђРќРР—РђР¦РРЇ Р РђР‘РћРў РќРђ РћР‘РЄР•РљРўР•',
+    grandTotal: 12480,
+    tone: 'service',
+  },
+]
+
+function sumOfferAmounts(items: DemoOfferTableItem[]) {
+  return items.reduce(
+    (accumulator, item) => {
+      const productTotal = item.quantity * item.unitPrice
+      const installationTotal = item.quantity * item.installationUnitPrice
+
+      return {
+        productTotal: accumulator.productTotal + productTotal,
+        installationTotal: accumulator.installationTotal + installationTotal,
+        grandTotal: accumulator.grandTotal + productTotal + installationTotal,
+      }
+    },
+    {
+      productTotal: 0,
+      installationTotal: 0,
+      grandTotal: 0,
+    },
+  )
+}
+
+function buildOfferTotals(
+  items: DemoOfferTableItem[],
+  serviceTotals: DemoOfferTableTotal[] = defaultOfferServiceTotals,
+): DemoOfferTableTotal[] {
+  const subtotal = sumOfferAmounts(items)
+  const serviceGrandTotal = serviceTotals.reduce((accumulator, total) => accumulator + total.grandTotal, 0)
+
+  return [
+    {
+      id: 'offer-subtotal',
+      label: 'РРўРћР“Рћ',
+      productTotal: subtotal.productTotal,
+      installationTotal: subtotal.installationTotal,
+      grandTotal: subtotal.grandTotal,
+      tone: 'subtotal',
+    },
+    ...serviceTotals.map((total) => ({ ...total })),
+    {
+      id: 'offer-final',
+      label: 'РРўРћР“Рћ, Р’РљР›Р®Р§РђРЇ Р”РћРЎРўРђР’РљРЈ Р РњРћРќРўРђР–',
+      grandTotal: subtotal.grandTotal + serviceGrandTotal,
+      tone: 'final',
+    },
+  ]
+}
+
+export function createEmptyOfferTable(): DemoOfferTable {
+  return {
+    items: [],
+    totals: buildOfferTotals([]),
+  }
+}
+
+export function recalculateOfferTable(offerTable: DemoOfferTable): DemoOfferTable {
+  const serviceTotals = offerTable.totals
+    .filter((total) => total.tone === 'service')
+    .map((total) => ({
+      id: total.id,
+      label: total.label,
+      grandTotal: total.grandTotal,
+      tone: 'service' as const,
+    }))
+
+  return {
+    ...offerTable,
+    totals: buildOfferTotals(offerTable.items, serviceTotals.length ? serviceTotals : defaultOfferServiceTotals),
+  }
+}
+
+export function getDemoOfferTable(): DemoOfferTable {
+  const items: DemoOfferTableItem[] = [
+    {
+      id: 'offer-mnemo',
+      description:
+        'Мнемосхема тактильная полноцветная с рельефом и дублированием шрифтом Брайля, защитное покрытие, формат 610x470 мм.',
+      quantity: 1,
+      unitPrice: 18640,
+      installationUnitPrice: 1650,
+    },
+    {
+      id: 'offer-sign-set',
+      description:
+        'Комплект тактильных пиктограмм для входной группы и основных точек маршрута: вход, направление движения, кнопка вызова, зона ожидания.',
+      quantity: 4,
+      unitPrice: 742.35,
+      installationUnitPrice: 315,
+    },
+    {
+      id: 'offer-contrast-tape',
+      description:
+        'Лента контрастная для маркировки ступеней и дверных проемов, самоклеящаяся, желтая, ширина 100 мм.',
+      quantity: 18,
+      unitPrice: 684.1,
+      installationUnitPrice: 420,
+    },
+    {
+      id: 'offer-tactile-tile',
+      description:
+        'Плитка тактильная предупреждающая, полиуретановая, наружное исполнение, размер 300x300 мм.',
+      quantity: 24,
+      unitPrice: 1952.75,
+      installationUnitPrice: 735,
+    },
+    {
+      id: 'offer-nosing',
+      description:
+        'Накладка на ступень противоскользящая в алюминиевом профиле с контрастной вставкой, длина 1000 мм.',
+      quantity: 11,
+      unitPrice: 1909.95,
+      installationUnitPrice: 682.5,
+    },
+    {
+      id: 'offer-call-button',
+      description:
+        'Антивандальная кнопка вызова со стойкой крепления и базовой индикацией для входной зоны.',
+      quantity: 1,
+      unitPrice: 4875.9,
+      installationUnitPrice: 1260,
+    },
+    {
+      id: 'offer-loop',
+      description:
+        'Переносная индукционная система для обслуживания посетителей с нарушением слуха, портативный комплект.',
+      quantity: 1,
+      unitPrice: 23184.55,
+      installationUnitPrice: 0,
+    },
+    {
+      id: 'offer-handrail',
+      description:
+        'Ограждение с двухуровневыми поручнями, нержавеющая сталь, напольное исполнение, основной марш и площадка.',
+      quantity: 12.5,
+      unitPrice: 18900,
+      installationUnitPrice: 8400,
+    },
+    {
+      id: 'offer-dismantle-rail',
+      description: 'Демонтаж существующих металлических ограждений по линии прохода.',
+      quantity: 8,
+      unitPrice: 0,
+      installationUnitPrice: 500,
+    },
+    {
+      id: 'offer-dismantle-tile',
+      description: 'Демонтаж существующей тактильной плитки на проблемных участках маршрута.',
+      quantity: 1.62,
+      unitPrice: 0,
+      installationUnitPrice: 500,
+    },
+    {
+      id: 'offer-dismantle-step',
+      description: 'Демонтаж существующих накладок на ступени с подготовкой основания под новый монтаж.',
+      quantity: 4.5,
+      unitPrice: 0,
+      installationUnitPrice: 150,
+    },
+  ]
+
+  const subtotal = sumOfferAmounts(items)
+  const transportTotal = 83605.29
+  const setupTotal = 12480
+
+  return {
+    items,
+    totals: [
+      {
+        id: 'offer-subtotal',
+        label: 'ИТОГО',
+        productTotal: subtotal.productTotal,
+        installationTotal: subtotal.installationTotal,
+        grandTotal: subtotal.grandTotal,
+        tone: 'subtotal',
+      },
+      {
+        id: 'offer-transport',
+        label: 'ТРАНСПОРТНЫЕ РАСХОДЫ',
+        grandTotal: transportTotal,
+        tone: 'service',
+      },
+      {
+        id: 'offer-setup',
+        label: 'ОРГАНИЗАЦИЯ РАБОТ НА ОБЪЕКТЕ',
+        grandTotal: setupTotal,
+        tone: 'service',
+      },
+      {
+        id: 'offer-final',
+        label: 'ИТОГО, ВКЛЮЧАЯ ДОСТАВКУ И МОНТАЖ',
+        grandTotal: subtotal.grandTotal + transportTotal + setupTotal,
+        tone: 'final',
+      },
+    ],
+  }
+}
+
+function makeCellSource(label: string, sourceType: 'norm' | 'price' | 'photo' | 'note', excerpt: string) {
+  return {
+    label,
+    sourceType,
+    excerpt,
+    confidence: sourceType === 'price' || sourceType === 'norm' ? ('medium' as const) : ('high' as const),
+  }
+}
+
+function makeCellAnnotation(
+  cellId: DraftCellId,
+  sources: ReturnType<typeof makeCellSource>[],
+  issue?: DraftCellAnnotation['issue'],
+): DraftCellAnnotation {
+  return {
+    cellId,
+    sources,
+    issue,
+  }
+}
+
+export function getDemoDraftCellAnnotations(
+  branch: DemoDocumentType,
+): Partial<Record<DraftCellId, DraftCellAnnotation>> {
+  if (branch !== 'kp') {
+    return {}
+  }
+
+  const offerTable = getDemoOfferTable()
+  const annotations: Partial<Record<DraftCellId, DraftCellAnnotation>> = {}
+
+  offerTable.items.forEach((item, index) => {
+    const baseNote = `Позиция ${index + 1} собрана из демонстрационного набора материалов и монтажных работ.`
+    const descriptionId = `kp-item:${item.id}:description` as DraftCellId
+    const quantityId = `kp-item:${item.id}:quantity` as DraftCellId
+    const unitPriceId = `kp-item:${item.id}:unitPrice` as DraftCellId
+    const installationPriceId = `kp-item:${item.id}:installationUnitPrice` as DraftCellId
+    const productTotalId = `kp-item:${item.id}:productTotal` as DraftCellId
+    const installationTotalId = `kp-item:${item.id}:installationTotal` as DraftCellId
+    const grandTotalId = `kp-item:${item.id}:grandTotal` as DraftCellId
+
+    annotations[descriptionId] = makeCellAnnotation(descriptionId, [
+      makeCellSource('Демо-позиция', 'note', baseNote),
+      makeCellSource('Фото и замеры', 'photo', 'Описание опирается на нейтральные фото зоны и лист замеров.'),
+    ])
+
+    annotations[quantityId] = makeCellAnnotation(quantityId, [
+      makeCellSource('Ведомость объёмов', 'note', `Количество ${item.quantity} зафиксировано как стартовый объём для демонстрации.`),
+    ])
+
+    annotations[unitPriceId] = makeCellAnnotation(
+      unitPriceId,
+      [
+        makeCellSource('Демо-прайс', 'price', 'Цена товара взята из демонстрационного прайс-листа и требует ручной сверки.'),
+      ],
+      item.id === 'offer-loop'
+        ? {
+            severity: 'high',
+            title: 'Проверить цену поставщика',
+            summary: 'По этой позиции цена чувствительна к наличию и бренду, нужна ручная перепроверка.',
+          }
+        : undefined,
+    )
+
+    annotations[installationPriceId] = makeCellAnnotation(
+      installationPriceId,
+      [
+        makeCellSource('Монтажная оценка', 'note', 'Стоимость монтажа собрана из типового окна работ и логистики бригады.'),
+      ],
+      item.id === 'offer-handrail'
+        ? {
+            severity: 'medium',
+            title: 'Уточнить сложность монтажа',
+            summary: 'Монтаж может измениться после уточнения основания и узлов крепления.',
+          }
+        : undefined,
+    )
+
+    annotations[productTotalId] = makeCellAnnotation(productTotalId, [
+      makeCellSource('Авторасчёт', 'note', 'Сумма товара считается автоматически: количество × цена товара.'),
+    ])
+
+    annotations[installationTotalId] = makeCellAnnotation(installationTotalId, [
+      makeCellSource('Авторасчёт', 'note', 'Сумма монтажа считается автоматически: количество × цена монтажа.'),
+    ])
+
+    annotations[grandTotalId] = makeCellAnnotation(grandTotalId, [
+      makeCellSource('Авторасчёт', 'note', 'Итог по строке складывается из суммы товара и суммы монтажа.'),
+    ])
+  })
+
+  offerTable.totals.forEach((total) => {
+    const cellId = `kp-total:${total.id}` as DraftCellId
+    annotations[cellId] = makeCellAnnotation(cellId, [
+      makeCellSource(
+        total.tone === 'service' ? 'Служебная надбавка' : 'Авторасчёт',
+        'note',
+        total.tone === 'service'
+          ? 'Значение заведено как отдельная сервисная строка и проверяется вручную.'
+          : 'Итоговый блок считается автоматически на основе строк таблицы.',
+      ),
+    ])
+  })
+
+  const dueDateId = 'kp-field:dueDate' as DraftCellId
+  annotations[dueDateId] = makeCellAnnotation(
+    dueDateId,
+    [
+      makeCellSource('Коммерческие вводные', 'note', 'Срок берётся из рабочего окна проекта и подтверждается вручную перед отправкой.'),
+    ],
+    {
+      severity: 'medium',
+      title: 'Подтвердить рабочее окно',
+      summary: 'Перед финальной отправкой нужно сверить срок с фактическим графиком объекта.',
+    },
+  )
+
+  const specialTermsId = 'kp-field:specialTerms' as DraftCellId
+  annotations[specialTermsId] = makeCellAnnotation(
+    specialTermsId,
+    [
+      makeCellSource('Свободные вводные', 'note', 'Формулировка собирается из заметок менеджера и обычно дорабатывается вручную.'),
+    ],
+    {
+      severity: 'low',
+      title: 'Упростить формулировку',
+      summary: 'Текст лучше держать коротким и однозначным перед экспортом.',
+    },
+  )
+
+  return annotations
+}
+
 const emptyDraft: DemoDraft = {
   id: 'draft-main',
   caseId: 'case-main',
   documentType: 'kp',
   sections: [],
+  offerTable: createEmptyOfferTable(),
   fields: blankDraftFields,
+  cellAnnotations: {},
   issues: [],
   sources: [],
-  approvalState: 'needs_review',
+}
+
+function getTodayLocalDate() {
+  const now = new Date()
+  const timezoneOffsetMs = now.getTimezoneOffset() * 60 * 1000
+  return new Date(now.getTime() - timezoneOffsetMs).toISOString().slice(0, 10)
+}
+
+export function createEmptyExportForm() {
+  return {
+    counterpartyName: '',
+    counterpartyAddress: '',
+    objectAddress: '',
+    documentDate: getTodayLocalDate(),
+    signatoryName: '',
+    manualNotes: '',
+  } satisfies DemoState['exportForm']
+}
+
+export function createDemoExportForm() {
+  return {
+    counterpartyName: 'ООО "Городская среда"',
+    counterpartyAddress: 'Москва, ул. Новая Басманная, д. 14, стр. 2',
+    objectAddress: 'Москва, Ленинский проспект, д. 52, входная группа поликлиники',
+    documentDate: getTodayLocalDate(),
+    signatoryName: 'Иванов Сергей Петрович',
+    manualNotes:
+      'Демо-реквизиты для финального экспорта. В реальном сценарии эти данные сотрудник уточняет перед выпуском документа.',
+  } satisfies DemoState['exportForm']
+}
+
+export function createEmptyExportGeneration() {
+  return {
+    selectedFormat: null,
+    status: 'idle',
+    progressPercent: 0,
+    generatedArtifact: null,
+    downloadMessage: null,
+  } satisfies DemoState['exportGeneration']
 }
 
 export const totalRunDurationMs = runStageBlueprints.kp.reduce(
@@ -174,17 +562,27 @@ export function getDefaultSectionId(branch: DemoDocumentType) {
   return branch === 'kp' ? 'kp-overview' : 'tz-overview'
 }
 
-export function getDemoNeedText(branch: DemoDocumentType, pipelineName: string) {
+export function getDemoNeedText(branch: DemoDocumentType, _pipelineName: string) {
   if (branch === 'kp') {
-    return `Для пайплайна «${pipelineName}» нужно собрать понятное коммерческое предложение: зафиксировать задачу, обозначить ожидаемый результат и подготовить основу для последующей упаковки.`
+    return `Нужно привести входную группу в рабочее и понятное состояние для маломобильных посетителей. Сейчас на входе слишком крутой подъём, неудобный подход к двери, старое металлическое ограждение и скользкое покрытие перед входом. Заказчик хочет решить вопрос без полной перестройки крыльца, но так, чтобы объект выглядел аккуратно и им можно было пользоваться в обычном режиме.
+
+Нужно предусмотреть демонтаж того, что сейчас мешает нормальному проходу: старого ограждения, повреждённых участков покрытия и элементов, которые сужают проход. Далее предложить новый узел входа: нормальный пандус или более удобное решение по подъёму, новые поручни с двух сторон, нескользящее покрытие, понятную организацию подхода к двери и безопасный заезд без резких перепадов.
+
+Также нужно заложить закупку основных позиций: металлоконструкции для поручней и ограждений, покрытие для наружного применения, крепёж, доборные элементы, при необходимости тактильные обозначения и таблички. Если где-то требуется подливка, выравнивание основания, локальный ремонт ступеней или площадки перед входом, это тоже нужно включить в состав работ.
+
+Важно, чтобы решение было без избыточной сложности: объект действующий, работы нужно выполнить поэтапно, без долгого перекрытия входа. Нужен понятный перечень того, что демонтируем, что изготавливаем или закупаем, что монтируем на месте и какой итоговый результат должен получить заказчик.`
   }
 
-  return `Для пайплайна «${pipelineName}» нужно сформулировать техническую задачу, определить измеримые параметры и подготовить структуру будущего ТЗ в нейтральном виде.`
+  return `Нужно зафиксировать состав работ по входной группе и маршруту прохода. Требуется убрать мешающие элементы, привести основание и подход к двери в рабочее состояние, предусмотреть безопасное перемещение маломобильных посетителей и исключить резкие перепады по высоте на основном пути движения.
+
+В составе решения нужно отразить демонтаж старых ограждений и повреждённых участков, выравнивание проблемных зон, устройство нового узла прохода, монтаж поручней, обновление покрытия и все сопутствующие работы, без которых результат не будет рабочим. Отдельно нужно учесть материалы и элементы, которые должны быть закуплены для монтажа.
+
+Также нужно обозначить ограничения по объекту: вход действующий, работы желательно выполнять поэтапно, без длительной остановки эксплуатации. Формулировки должны быть прикладными: какие элементы меняем, что именно выполняем на площадке, что должно быть смонтировано в итоге и каким требованиям должен соответствовать готовый результат.`
 }
 
 export function getDemoNotes(branch: DemoDocumentType) {
   if (branch === 'kp') {
-    return 'При генерации важно учесть рабочее окно, требования к безопасному проходу и необходимость оставить итоговый пакет обезличенным.'
+    return 'Клиент рассматривает предложение как ориентир для первого согласования, поэтому стоимость лучше держать в нижней рабочей границе без лишних запасов и необязательных позиций. Если возможны разные варианты исполнения, в основу ставить надежное и аккуратное решение без избыточного удорожания, а улучшения при необходимости выносить отдельно. Сроки показывать стандартные, без ускоренного монтажа, но с учетом того, что вход действующий и работы желательно выполнять поэтапно.'
   }
 
   return 'При подготовке ТЗ важно учесть измеримые параметры, рабочее окно монтажа и обязательность нейтральных формулировок без персональных ссылок.'
@@ -314,6 +712,17 @@ export function getDemoDraftSections(
           'В документе фиксируются цель проекта, ожидаемый результат и границы будущей коммерческой упаковки.',
           'Финальные реквизиты, контрагенты и персональные данные будут добавлены человеком на завершающем этапе.',
         ],
+        table: {
+          title: 'Сводная таблица',
+          columns: ['Позиция', 'Что входит', 'Ед.', 'Кол-во', 'Комментарий'],
+          rows: [
+            ['Подготовка зоны', 'Демонтаж старых элементов и расчистка подхода', 'этап', '1', 'Стартовый блок перед монтажом'],
+            ['Пандусный узел', 'Каркас, настил и примыкание к входной площадке', 'комплект', '1', 'Базовое решение для демо-сборки'],
+            ['Поручни', 'Двусторонние поручни с крепежом', 'линия', '2', 'Полный контур сопровождения'],
+            ['Покрытие', 'Нескользящее наружное покрытие', 'зона', '1', 'Для основной траектории движения'],
+            ['Сопутствующие работы', 'Подгонка основания и финишная сборка', 'этап', '1', 'Закрывает демонстрационный объем'],
+          ],
+        },
       },
       {
         id: 'kp-materials',
@@ -356,6 +765,16 @@ export function getDemoDraftSections(
         `Пайплайн «${pipelineName}» переводится в формат технического задания на базе нейтральной проектной основы.`,
         'Документ описывает цель, измеримые параметры и требования к структуре итогового решения.',
       ],
+      table: {
+        title: 'Контрольные параметры',
+        columns: ['Параметр', 'Текущее значение', 'Целевое состояние', 'Примечание'],
+        rows: [
+          ['Ширина прохода', '1,24 м', 'не уже 1,20 м', 'Оставляем безопасный запас'],
+          ['Высота подъема', '0,42 м', 'с плавным набором', 'Без резкого перелома по траектории'],
+          ['Площадка перед входом', '1,56 x 1,68 м', 'достаточно для разворота', 'Используется как опорная зона'],
+          ['Поручни', 'отсутствуют', 'с двух сторон', 'Закладывается в базовое решение'],
+        ],
+      },
     },
     {
       id: 'tz-parameters',
@@ -484,87 +903,66 @@ export function getDemoDraftSources(branch: DemoDocumentType): SourceLink[] {
   ]
 }
 
-export function createDemoExportArtifacts(): ExportArtifact[] {
-  return [
-    {
-      id: 'export-demo-pdf',
-      format: 'PDF',
-      fileName: 'NuOperator-demo-pipeline.pdf',
-      createdAt: '2026-04-02T10:12:00.000Z',
-      status: 'generated',
+export function createInitialDemoState(): DemoState {
+  return {
+    cases: [
+      {
+        id: 'case-main',
+        kpRequestSummary: '',
+        kpContextNotes: '',
+        kpMaterials: [],
+        tzRequestSummary: '',
+        tzTechnicalNotes: '',
+        tzMeasurements: [],
+        runId: 'run-main',
+        draftId: 'draft-main',
+        exportId: 'export-main',
+        isAnchor: true,
+      },
+    ],
+    run: {
+      id: 'run-main',
+      caseId: 'case-main',
+      status: 'idle',
+      startedAt: null,
+      completedAt: null,
+      stages: getRunStageBlueprints('kp'),
     },
-    {
-      id: 'export-demo-docx',
-      format: 'DOCX',
-      fileName: 'NuOperator-demo-pipeline.docx',
-      createdAt: '2026-04-02T10:14:00.000Z',
-      status: 'generated',
+    draft: JSON.parse(JSON.stringify(emptyDraft)) as DemoDraft,
+    nextPipelineNumber: 1,
+    selectedDocumentType: 'kp',
+    selectedSectionId: getDefaultSectionId('kp'),
+    focusedIssueId: null,
+    exportForm: createEmptyExportForm(),
+    exportGeneration: createEmptyExportGeneration(),
+    recentOperations: [],
+    currentBranchStage: {
+      kp: 'need',
+      tz: 'source',
     },
-  ]
-}
-
-export const initialDemoState: DemoState = {
-  cases: [
-    {
-      id: 'case-main',
-      kpRequestSummary: '',
-      kpContextNotes: '',
-      kpMaterials: [],
-      tzRequestSummary: '',
-      tzTechnicalNotes: '',
-      tzMeasurements: [],
-      runId: 'run-main',
-      draftId: 'draft-main',
-      approvalId: 'approval-main',
-      isAnchor: true,
+    branchProgress: {
+      kp: {
+        currentStageId: 'need',
+        completedStageIds: [],
+      },
+      tz: {
+        currentStageId: 'source',
+        completedStageIds: [],
+      },
     },
-  ],
-  run: {
-    id: 'run-main',
-    caseId: 'case-main',
-    status: 'idle',
-    startedAt: null,
-    completedAt: null,
-    stages: getRunStageBlueprints('kp'),
-  },
-  draft: emptyDraft,
-  selectedDocumentType: 'kp',
-  selectedSectionId: getDefaultSectionId('kp'),
-  focusedIssueId: null,
-  exportArtifacts: [],
-  previewArtifact: null,
-  approvalSent: false,
-  recentOperations: [],
-  currentBranchStage: {
-    kp: 'need',
-    tz: 'source',
-  },
-  branchProgress: {
-    kp: {
-      currentStageId: 'need',
-      completedStageIds: [],
+    selectedSourceKpId: null,
+    branchLaunch: {
+      kp: {
+        started: false,
+        pipelineName: '',
+      },
+      tz: {
+        started: false,
+        pipelineName: '',
+      },
     },
-    tz: {
-      currentStageId: 'source',
-      completedStageIds: [],
-    },
-  },
-  selectedSourceKpId: null,
-  branchLaunch: {
-    kp: {
-      started: false,
-      pipelineName: '',
-    },
-    tz: {
-      started: false,
-      pipelineName: '',
-    },
-  },
-  demoAppliedByPage: {},
-}
-
-export function createInitialDemoState() {
-  return JSON.parse(JSON.stringify(initialDemoState)) as DemoState
+    demoAppliedByPage: {},
+  } satisfies DemoState
 }
 
 export function resolveRunStages(run: DemoRun, branch: DemoDocumentType, now = Date.now()) {
@@ -582,10 +980,10 @@ export function resolveRunStages(run: DemoRun, branch: DemoDocumentType, now = D
     let status: StageStatus = 'pending'
     let progress = 0
 
-    if (run.status !== 'idle' && elapsed >= stageEnd) {
+    if (run.status !== 'idle' && run.status !== 'aborted' && elapsed >= stageEnd) {
       status = 'completed'
       progress = 1
-    } else if (run.status !== 'idle' && elapsed >= stageStart) {
+    } else if (run.status !== 'idle' && run.status !== 'aborted' && elapsed >= stageStart) {
       status = 'in_progress'
       progress = Math.min((elapsed - stageStart) / stage.durationMs, 1)
     }
@@ -602,7 +1000,7 @@ export function resolveRunStages(run: DemoRun, branch: DemoDocumentType, now = D
   return {
     stages,
     totalProgress: Math.min(elapsed / totalRunDurationMs, 1),
-    activeStage: stages.find((stage) => stage.status === 'in_progress') ?? stages.at(-1) ?? null,
+    activeStage: stages.find((stage) => stage.status === 'in_progress') ?? null,
     isComplete: stages.every((stage) => stage.status === 'completed'),
   }
 }
@@ -610,11 +1008,12 @@ export function resolveRunStages(run: DemoRun, branch: DemoDocumentType, now = D
 export function createExportArtifact(format: ExportArtifact['format']) {
   const timestamp = new Date().toISOString()
   const stamp = timestamp.replace(/[:.]/g, '-')
+  const extension = format === 'XLSX' ? 'xlsx' : format.toLowerCase()
 
   return {
     id: `export-${format.toLowerCase()}-${stamp}`,
     format,
-    fileName: `NuOperator-${format.toLowerCase()}-${stamp}.${format.toLowerCase()}`,
+    fileName: `NuOperator-${format.toLowerCase()}-${stamp}.${extension}`,
     createdAt: timestamp,
     status: 'generated',
   } satisfies ExportArtifact

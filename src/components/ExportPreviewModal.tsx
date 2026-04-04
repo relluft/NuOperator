@@ -35,10 +35,6 @@ export function ExportPreviewModal({
                   Предпросмотр выгрузки
                 </span>
                 <h2 className="font-serif text-3xl text-[var(--ink-950)]">{artifact.format} готов к показу</h2>
-                <p className="text-sm text-[var(--ink-700)]">
-                  Интерфейс не создаёт реальный файл, а демонстрирует финальный шаг сценария и то, как будет
-                  выглядеть подтверждение экспорта.
-                </p>
               </div>
 
               <button
@@ -79,11 +75,6 @@ export function ExportPreviewModal({
                 </div>
               </div>
 
-              <div className="mt-6 rounded-[22px] border border-dashed border-[var(--border-strong)] bg-[rgba(11,19,28,0.88)] p-5 text-sm leading-7 text-[var(--ink-800)]">
-                В финальной версии здесь будет реальный экспортируемый документ по шаблону компании. Для демо
-                мы показываем ту же логику согласования: документ собран, проверен и готов к дальнейшему
-                ручному заполнению чувствительных данных.
-              </div>
             </div>
 
             <div className="mt-6 flex flex-wrap justify-end gap-3">

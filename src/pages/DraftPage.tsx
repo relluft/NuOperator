@@ -3,7 +3,7 @@ import { Link, Navigate, useParams } from 'react-router-dom'
 import { DocumentPreview } from '../components/DocumentPreview'
 import { Button, Eyebrow, Panel, StatusPill } from '../components/ui'
 import { useDemo } from '../context/DemoContext'
-import { approvePath } from '../lib/routes'
+import { exportPath } from '../lib/routes'
 import { getBranchLabel } from '../lib/workflow'
 import type { DemoDocumentType, DemoPageKey } from '../types/demo'
 
@@ -23,12 +23,12 @@ export function DraftPage() {
       draft,
       selectedSectionId,
       focusedIssueId,
-      selectedSourceKpId,
       branchLaunch,
       demoAppliedByPage,
     },
     applyDemoVariant,
     updateField,
+    updateOfferItem,
     selectSection,
     focusIssue,
     openSectionFromSource,
@@ -51,33 +51,50 @@ export function DraftPage() {
     return null
   }
 
+  if (activeBranch === 'kp') {
+    return (
+      <div className="space-y-5">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <Eyebrow>{getBranchLabel(activeBranch)} / Редактор</Eyebrow>
+
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <Link
+              to={exportPath(activeBranch, demoCase.exportId)}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--brand-600)] px-4 py-2.5 text-sm font-semibold text-slate-950"
+            >
+              Перейти к экспорту
+              <ArrowRight size={16} />
+            </Link>
+          </div>
+        </div>
+
+        <DocumentPreview
+          documentType={activeBranch}
+          sections={visibleSections}
+          offerTable={draft.offerTable}
+          fields={draft.fields}
+          cellAnnotations={draft.cellAnnotations}
+          pipelineName={pipelineName}
+          selectedSectionId={selectedSectionId}
+          onUpdateOfferItem={updateOfferItem}
+          onUpdateField={updateField}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <Panel className="rounded-[34px] p-6 md:p-8">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr),320px]">
           <div>
             <Eyebrow>{getBranchLabel(activeBranch)} / Редактор</Eyebrow>
-            <h2 className="mt-3 text-4xl font-semibold tracking-tight text-[var(--ink-950)]">{pipelineName}</h2>
-            <p className="mt-3 max-w-3xl text-base leading-8 text-[var(--ink-800)]">
-              {hasDemoVariant
-                ? activeBranch === 'kp'
-                  ? 'Сейчас открыт обезличенный демонстрационный черновик КП: его можно просматривать по секциям, редактировать поля и использовать как безопасный пример финального документа.'
-                  : selectedSourceKpId
-                    ? 'Сейчас открыт обезличенный демонстрационный черновик ТЗ на базе выбранной нейтральной основы.'
-                    : 'Сейчас открыт обезличенный демонстрационный черновик ТЗ без выбранной основы из КП.'
-                : 'На этом экране пока нет автоматически подставленного документа. Пользователь видит пустую оболочку редактора и сам решает, когда показать демонстрационный черновик.'}
-            </p>
           </div>
 
           <div className="rounded-[30px] border border-[var(--border-soft)] bg-[var(--surface-strong)] p-5">
             <div className="text-sm text-[var(--ink-700)]">Состояние редактора</div>
             <div className="mt-2 text-2xl font-semibold text-[var(--ink-950)]">
               {hasDemoVariant ? 'Демонстрационный черновик' : 'Пустая рабочая оболочка'}
-            </div>
-            <div className="mt-3 text-sm leading-7 text-[var(--ink-800)]">
-              {hasDemoVariant
-                ? 'Черновик безопасен для показа: персональные данные, контрагенты и контакты в нём не используются.'
-                : 'Нажмите маленькую кнопку демонстрации, чтобы раскрыть пример секций, замечаний QA и источников.'}
             </div>
             <Button className="mt-5 w-full justify-center" variant="secondary" onClick={() => applyDemoVariant(pageKey)}>
               <Sparkles size={16} />
@@ -112,7 +129,7 @@ export function DraftPage() {
             </div>
           ) : (
             <div className="mt-4 rounded-[22px] border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] p-4 text-sm leading-7 text-[var(--ink-700)]">
-              Секции документа появятся после включения демонстрационного варианта.
+              Пока пусто.
             </div>
           )}
         </Panel>
@@ -120,6 +137,7 @@ export function DraftPage() {
         <DocumentPreview
           documentType={activeBranch}
           sections={visibleSections}
+          offerTable={null}
           fields={draft.fields}
           pipelineName={pipelineName}
           selectedSectionId={selectedSectionId}
@@ -183,7 +201,7 @@ export function DraftPage() {
                   ))
               ) : (
                 <div className="rounded-[22px] border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] px-4 py-4 text-sm text-[var(--ink-700)]">
-                  После включения демо здесь появятся обезличенные замечания по качеству черновика.
+                  Пока пусто.
                 </div>
               )}
             </div>
@@ -215,17 +233,17 @@ export function DraftPage() {
                   ))
               ) : (
                 <div className="rounded-[22px] border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] px-4 py-4 text-sm text-[var(--ink-700)]">
-                  Источники и ссылки на материалы появятся здесь только после включения демонстрационного варианта.
+                  Пока пусто.
                 </div>
               )}
             </div>
           </Panel>
 
           <Link
-            to={approvePath(activeBranch, demoCase.approvalId)}
+            to={exportPath(activeBranch, demoCase.exportId)}
             className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--brand-600)] px-4 py-3 text-sm font-semibold text-slate-950"
           >
-            Перейти к согласованию
+            Перейти к экспорту
             <ArrowRight size={16} />
           </Link>
         </div>

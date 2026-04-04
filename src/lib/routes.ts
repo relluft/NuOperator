@@ -26,8 +26,8 @@ export function draftPath(branch: DemoDocumentType, draftId: string) {
   return `${branchRootPath(branch)}/drafts/${draftId}`
 }
 
-export function approvePath(branch: DemoDocumentType, approvalId: string) {
-  return `${branchRootPath(branch)}/approve/${approvalId}`
+export function exportPath(branch: DemoDocumentType, exportId: string) {
+  return `${branchRootPath(branch)}/export/${exportId}`
 }
 
 export function defaultCaseStagePath(branch: DemoDocumentType, caseId: string) {
@@ -39,6 +39,7 @@ export function stagePath(
   caseId: string,
   runId: string,
   draftId: string,
+  exportId: string,
   stageId: DemoWorkflowStageId,
 ) {
   if (stageId === 'run') {
@@ -47,6 +48,10 @@ export function stagePath(
 
   if (stageId === 'editor') {
     return draftPath(branch, draftId)
+  }
+
+  if (stageId === 'export') {
+    return exportPath(branch, exportId)
   }
 
   return caseStagePath(

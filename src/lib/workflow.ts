@@ -2,6 +2,7 @@ import {
   Boxes,
   ClipboardPenLine,
   FileCog,
+  FileOutput,
   MessageSquareQuote,
   ScanSearch,
   ScrollText,
@@ -35,7 +36,7 @@ const workflowDefinitions: Record<DemoDocumentType, WorkflowStageDefinition[]> =
     },
     {
       id: 'comments',
-      label: 'Комментарии и вводные',
+      label: 'Комментарии',
       shortLabel: 'Вводные',
       description: 'Сохраняем свободные важные условия, не относящиеся напрямую к потребности и материалам.',
       icon: MessageSquareQuote,
@@ -49,10 +50,17 @@ const workflowDefinitions: Record<DemoDocumentType, WorkflowStageDefinition[]> =
     },
     {
       id: 'editor',
-      label: 'Редактор и согласование',
+      label: 'Редактор',
       shortLabel: 'Редактор',
       description: 'Просматриваем черновик, вносим правки и готовим пакет к показу.',
       icon: FileCog,
+    },
+    {
+      id: 'export',
+      label: 'Экспорт',
+      shortLabel: 'Экспорт',
+      description: 'Вносим ручные реквизиты, выбираем формат и подготавливаем финальный документ.',
+      icon: FileOutput,
     },
   ],
   tz: [
@@ -86,10 +94,17 @@ const workflowDefinitions: Record<DemoDocumentType, WorkflowStageDefinition[]> =
     },
     {
       id: 'editor',
-      label: 'Редактор и согласование',
+      label: 'Редактор',
       shortLabel: 'Редактор',
       description: 'Проверяем черновик, уточняем формулировки и готовим итоговый пакет.',
       icon: FileCog,
+    },
+    {
+      id: 'export',
+      label: 'Экспорт',
+      shortLabel: 'Экспорт',
+      description: 'Добавляем финальные реквизиты и запускаем демо-генерацию в нужном формате.',
+      icon: FileOutput,
     },
   ],
 }

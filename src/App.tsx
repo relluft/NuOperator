@@ -2,10 +2,10 @@ import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-
 import { AppLayout } from './components/AppLayout'
 import { DemoProvider } from './context/DemoContext'
 import { branchSelectionPath, workspaceBasePath } from './lib/routes'
-import { ApprovePage } from './pages/ApprovePage'
 import { CasePage } from './pages/CasePage'
 import { DashboardPage } from './pages/DashboardPage'
 import { DraftPage } from './pages/DraftPage'
+import { ExportPage } from './pages/ExportPage'
 import { LandingPage } from './pages/LandingPage'
 import { RunPage } from './pages/RunPage'
 
@@ -35,17 +35,17 @@ function App() {
             <Route path="cases/:caseId/:stageId" element={<CasePage />} />
             <Route path="runs/:runId" element={<RunPage />} />
             <Route path="drafts/:draftId" element={<DraftPage />} />
-            <Route path="approve/:approvalId" element={<ApprovePage />} />
+            <Route path="export/:exportId" element={<ExportPage />} />
           </Route>
 
           <Route path="/cases/:caseId" element={<Navigate to={branchSelectionPath()} replace />} />
           <Route path="/runs/:runId" element={<Navigate to={branchSelectionPath()} replace />} />
           <Route path="/drafts/:draftId" element={<Navigate to={branchSelectionPath()} replace />} />
-          <Route path="/approve/:approvalId" element={<Navigate to={branchSelectionPath()} replace />} />
+          <Route path="/export/:exportId" element={<Navigate to={branchSelectionPath()} replace />} />
           <Route path={`${workspaceBasePath}/cases/:caseId`} element={<LegacyWorkspaceRedirect />} />
           <Route path={`${workspaceBasePath}/runs/:runId`} element={<LegacyWorkspaceRedirect />} />
           <Route path={`${workspaceBasePath}/drafts/:draftId`} element={<LegacyWorkspaceRedirect />} />
-          <Route path={`${workspaceBasePath}/approve/:approvalId`} element={<LegacyWorkspaceRedirect />} />
+          <Route path={`${workspaceBasePath}/export/:exportId`} element={<LegacyWorkspaceRedirect />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

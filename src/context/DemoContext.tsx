@@ -9,13 +9,18 @@ import {
   type PropsWithChildren,
 } from 'react'
 import {
-  createDemoExportArtifacts,
+  createEmptyOfferTable,
+  createDemoExportForm,
+  createEmptyExportForm,
+  createEmptyExportGeneration,
   createExportArtifact,
   createInitialDemoState,
   getDefaultSectionId,
+  getDemoDraftCellAnnotations,
   getDemoDraftFields,
   getDemoDraftIssues,
   getDemoDraftSections,
+  getDemoOfferTable,
   getDemoDraftSources,
   getDemoMaterials,
   getDemoMeasurements,
@@ -23,7 +28,7 @@ import {
   getDemoNotes,
   getDemoSourceOptions,
   getRunStageBlueprints,
-  totalRunDurationMs,
+  recalculateOfferTable,
 } from '../data/demoData'
 import type {
   DemoDocumentType,
@@ -31,27 +36,32 @@ import type {
   DemoState,
   DemoWorkflowStageId,
   ExportFormat,
+  OfferItemEditableField,
   QAFlag,
   RecentOperation,
 } from '../types/demo'
 
-const storageKey = 'nuoperator-demo-state-v3'
+const storageKey = 'nuoperator-demo-state-v4'
 
 interface DemoContextValue {
   state: DemoState
   startPipeline: (branch: DemoDocumentType, pipelineName: string) => void
   applyDemoVariant: (pageKey: DemoPageKey) => void
   startRun: (runId: string, branch: DemoDocumentType) => void
-  skipRun: (branch: DemoDocumentType) => void
+  abortRun: (branch: DemoDocumentType) => void
   completeRun: (branch: DemoDocumentType) => void
   updateField: (fieldId: DemoState['draft']['fields'][number]['id'], value: string) => void
+  updateOfferItem: (itemId: string, field: OfferItemEditableField, value: string) => void
   selectDocumentType: (documentType: DemoDocumentType) => void
   selectSection: (sectionId: string) => void
   focusIssue: (issue: QAFlag) => void
   openSectionFromSource: (sectionId: string) => void
-  registerExport: (format: ExportFormat, branch: DemoDocumentType) => void
-  closeExportPreview: () => void
-  sendForSignature: (branch: DemoDocumentType) => void
+  updateExportField: (field: keyof DemoState['exportForm'], value: string) => void
+  startExportGeneration: (format: ExportFormat) => void
+  setExportProgress: (value: number) => void
+  completeExportGeneration: (branch: DemoDocumentType) => void
+  showDownloadMessage: () => void
+  resetExportGeneration: () => void
   setBranchStage: (branch: DemoDocumentType, stageId: DemoWorkflowStageId) => void
   markStageComplete: (branch: DemoDocumentType, stageId: DemoWorkflowStageId) => void
   selectSourceKp: (caseId: string | null) => void
@@ -64,19 +74,39 @@ interface DemoContextValue {
 const DemoContext = createContext<DemoContextValue | null>(null)
 
 function loadState() {
+  const initialState = createInitialDemoState()
+
   if (typeof window === 'undefined') {
-    return createInitialDemoState()
+    return initialState
   }
 
   const cached = window.localStorage.getItem(storageKey)
   if (!cached) {
-    return createInitialDemoState()
+    return initialState
   }
 
   try {
-    return JSON.parse(cached) as DemoState
+    const parsed = JSON.parse(cached) as Partial<DemoState>
+
+    return {
+      ...initialState,
+      ...parsed,
+      draft: {
+        ...initialState.draft,
+        ...parsed.draft,
+        cellAnnotations: parsed.draft?.cellAnnotations ?? initialState.draft.cellAnnotations,
+      },
+      exportForm: {
+        ...initialState.exportForm,
+        ...parsed.exportForm,
+      },
+      exportGeneration: {
+        ...initialState.exportGeneration,
+        ...parsed.exportGeneration,
+      },
+    }
   } catch {
-    return createInitialDemoState()
+    return initialState
   }
 }
 
@@ -117,9 +147,10 @@ function buildDraftDemo(branch: DemoDocumentType, pipelineName: string) {
     documentType: branch,
     fields: getDemoDraftFields(),
     sections: getDemoDraftSections(branch, pipelineName),
+    offerTable: branch === 'kp' ? getDemoOfferTable() : null,
+    cellAnnotations: getDemoDraftCellAnnotations(branch),
     issues: getDemoDraftIssues(branch),
     sources: getDemoDraftSources(branch),
-    approvalState: 'ready' as const,
   }
 }
 
@@ -131,17 +162,15 @@ export function DemoProvider({ children }: PropsWithChildren) {
   }, [state])
 
   const startPipeline = useCallback((branch: DemoDocumentType, pipelineName: string) => {
-    const trimmedName = pipelineName.trim()
-
-    if (!trimmedName) {
-      return
-    }
-
     setState((current) => {
       const demoCase = current.cases[0]
       if (!demoCase) {
         return current
       }
+
+      const trimmedName = pipelineName.trim()
+      const nextPipelineNumber = current.nextPipelineNumber ?? 1
+      const resolvedPipelineName = trimmedName || `Новый пайплайн ${nextPipelineNumber}`
 
       const clearedDemoFlags = stripBranchDemoFlags(current, branch)
       const resetCase =
@@ -162,6 +191,7 @@ export function DemoProvider({ children }: PropsWithChildren) {
       return {
         ...current,
         cases: [resetCase],
+        nextPipelineNumber: trimmedName ? nextPipelineNumber : nextPipelineNumber + 1,
         selectedDocumentType: branch,
         selectedSectionId: getDefaultSectionId(branch),
         selectedSourceKpId: branch === 'tz' ? null : current.selectedSourceKpId,
@@ -170,9 +200,10 @@ export function DemoProvider({ children }: PropsWithChildren) {
           documentType: branch,
           fields: current.draft.fields.map((field) => ({ ...field, value: '' })),
           sections: [],
+          offerTable: branch === 'kp' ? createEmptyOfferTable() : null,
+          cellAnnotations: {},
           issues: [],
           sources: [],
-          approvalState: 'needs_review',
         },
         run: {
           ...current.run,
@@ -181,15 +212,14 @@ export function DemoProvider({ children }: PropsWithChildren) {
           completedAt: null,
           stages: getRunStageBlueprints(branch),
         },
-        exportArtifacts: [],
-        previewArtifact: null,
-        approvalSent: false,
+        exportForm: createEmptyExportForm(),
+        exportGeneration: createEmptyExportGeneration(),
         focusedIssueId: null,
         branchLaunch: {
           ...current.branchLaunch,
           [branch]: {
             started: true,
-            pipelineName: trimmedName,
+            pipelineName: resolvedPipelineName,
           },
         },
         demoAppliedByPage: clearedDemoFlags,
@@ -209,7 +239,7 @@ export function DemoProvider({ children }: PropsWithChildren) {
           createOperation(
             branch,
             'Пайплайн запущен',
-            `Создан новый сценарий работы с названием «${trimmedName}».`,
+            `Создан новый сценарий работы с названием «${resolvedPipelineName}».`,
           ),
         ),
       }
@@ -232,7 +262,8 @@ export function DemoProvider({ children }: PropsWithChildren) {
       let nextDraft = current.draft
       let nextRun = current.run
       let nextSelectedSourceKpId = current.selectedSourceKpId
-      let nextExportArtifacts = current.exportArtifacts
+      let nextExportForm = current.exportForm
+      let nextExportGeneration = current.exportGeneration
       let title = 'Подключён демонстрационный вариант'
       let description = 'Для текущего шага применены демонстрационные данные.'
 
@@ -292,16 +323,16 @@ export function DemoProvider({ children }: PropsWithChildren) {
           title = branch === 'kp' ? 'Демо для редактора КП' : 'Демо для редактора ТЗ'
           description = 'Подготовлен обезличенный черновик для показа в редакторе.'
           break
-        case 'kp-approve':
-        case 'tz-approve':
+        case 'kp-export':
+        case 'tz-export':
           nextDraft = {
             ...nextDraft,
             ...buildDraftDemo(branch, pipelineName),
           }
-          nextExportArtifacts =
-            current.exportArtifacts.length > 0 ? current.exportArtifacts : createDemoExportArtifacts()
-          title = branch === 'kp' ? 'Демо для согласования КП' : 'Демо для согласования ТЗ'
-          description = 'Подготовлен пример итогового экрана согласования и истории экспорта.'
+          nextExportForm = createDemoExportForm()
+          nextExportGeneration = createEmptyExportGeneration()
+          title = branch === 'kp' ? 'Демо для экспорта КП' : 'Демо для экспорта ТЗ'
+          description = 'Подготовлен пример финального экрана экспорта с реквизитами и выбором формата.'
           break
         case 'kp-run':
         case 'tz-run':
@@ -325,7 +356,8 @@ export function DemoProvider({ children }: PropsWithChildren) {
         selectedDocumentType: branch,
         selectedSectionId: getDefaultSectionId(branch),
         selectedSourceKpId: nextSelectedSourceKpId,
-        exportArtifacts: nextExportArtifacts,
+        exportForm: nextExportForm,
+        exportGeneration: nextExportGeneration,
         demoAppliedByPage: {
           ...current.demoAppliedByPage,
           [pageKey]: true,
@@ -364,7 +396,7 @@ export function DemoProvider({ children }: PropsWithChildren) {
           },
         },
         focusedIssueId: null,
-        previewArtifact: null,
+        exportGeneration: createEmptyExportGeneration(),
         recentOperations: appendOperation(
           current,
           createOperation(
@@ -379,51 +411,45 @@ export function DemoProvider({ children }: PropsWithChildren) {
     })
   }, [])
 
-  const skipRun = useCallback((branch: DemoDocumentType) => {
-    setState((current) => ({
-      ...current,
-      selectedDocumentType: branch,
-      run: {
-        ...current.run,
-        status: 'completed',
-        startedAt: Date.now() - totalRunDurationMs,
-        completedAt: Date.now(),
-        stages: getRunStageBlueprints(branch),
-      },
-      draft: {
-        ...current.draft,
-        approvalState: 'ready',
-        documentType: branch,
-      },
-      currentBranchStage: {
-        ...current.currentBranchStage,
-        [branch]: 'editor',
-      },
-      branchProgress: {
-        ...current.branchProgress,
-        [branch]: {
-          currentStageId: 'editor',
-          completedStageIds: Array.from(
-            new Set([...current.branchProgress[branch].completedStageIds, 'run']),
-          ),
+  const abortRun = useCallback((branch: DemoDocumentType) => {
+    setState((current) => {
+      if (current.run.status !== 'running') {
+        return current
+      }
+
+      return {
+        ...current,
+        selectedDocumentType: branch,
+        run: {
+          ...current.run,
+          status: 'aborted',
+          startedAt: null,
+          completedAt: null,
+          stages: getRunStageBlueprints(branch),
         },
-      },
-      recentOperations: appendOperation(
-        current,
-        createOperation(
-          branch,
-          'Сборка завершена досрочно',
-          'Анимация пропущена, рабочий документ переведён в режим редактора.',
+        recentOperations: appendOperation(
+          current,
+          createOperation(
+            branch,
+            branch === 'kp' ? 'Сборка КП прервана' : 'Сборка ТЗ прервана',
+            'Выполнение остановлено, чтобы можно было вернуться к вводным и запустить сценарий заново.',
+          ),
         ),
-      ),
-    }))
+      }
+    })
   }, [])
+
 
   const completeRun = useCallback((branch: DemoDocumentType) => {
     setState((current) => {
       if (current.run.status === 'completed') {
         return current
       }
+
+      const pipelineName =
+        current.branchLaunch[branch].pipelineName ||
+        (branch === 'kp' ? 'Коммерческий пайплайн' : 'Технический пайплайн')
+      const draftPageKey = branch === 'kp' ? 'kp-draft' : 'tz-draft'
 
       return {
         ...current,
@@ -436,8 +462,11 @@ export function DemoProvider({ children }: PropsWithChildren) {
         },
         draft: {
           ...current.draft,
-          approvalState: 'ready',
-          documentType: branch,
+          ...buildDraftDemo(branch, pipelineName),
+        },
+        demoAppliedByPage: {
+          ...current.demoAppliedByPage,
+          [draftPageKey]: true,
         },
         currentBranchStage: {
           ...current.currentBranchStage,
@@ -487,6 +516,60 @@ export function DemoProvider({ children }: PropsWithChildren) {
     },
     [],
   )
+
+  const updateOfferItem = useCallback((itemId: string, field: OfferItemEditableField, value: string) => {
+    setState((current) => {
+      const offerTable = current.draft.offerTable
+      const item = offerTable?.items.find((entry) => entry.id === itemId)
+
+      if (!offerTable || !item) {
+        return current
+      }
+
+      if (field === 'description') {
+        if (item.description === value) {
+          return current
+        }
+
+        return {
+          ...current,
+          draft: {
+            ...current.draft,
+            offerTable: recalculateOfferTable({
+              ...offerTable,
+              items: offerTable.items.map((entry) =>
+                entry.id === itemId ? { ...entry, description: value } : entry,
+              ),
+            }),
+          },
+        }
+      }
+
+      const normalizedValue = value.replace(/\s+/g, '').replace(',', '.')
+      const parsedValue = normalizedValue === '' ? 0 : Number(normalizedValue)
+
+      if (!Number.isFinite(parsedValue)) {
+        return current
+      }
+
+      if (item[field] === parsedValue) {
+        return current
+      }
+
+      return {
+        ...current,
+        draft: {
+          ...current.draft,
+          offerTable: recalculateOfferTable({
+            ...offerTable,
+            items: offerTable.items.map((entry) =>
+              entry.id === itemId ? { ...entry, [field]: parsedValue } : entry,
+            ),
+          }),
+        },
+      }
+    })
+  }, [])
 
   const selectDocumentType = useCallback((documentType: DemoDocumentType) => {
     setState((current) => {
@@ -574,6 +657,7 @@ export function DemoProvider({ children }: PropsWithChildren) {
     })
   }, [])
 
+  /*
   const registerExport = useCallback((format: ExportFormat, branch: DemoDocumentType) => {
     setState((current) => {
       const artifact = createExportArtifact(format)
@@ -632,6 +716,114 @@ export function DemoProvider({ children }: PropsWithChildren) {
         ),
       }
     })
+  }, [])
+
+  */
+
+  const updateExportField = useCallback((field: keyof DemoState['exportForm'], value: string) => {
+    setState((current) => {
+      if (current.exportForm[field] === value) {
+        return current
+      }
+
+      return {
+        ...current,
+        exportForm: {
+          ...current.exportForm,
+          [field]: value,
+        },
+      }
+    })
+  }, [])
+
+  const startExportGeneration = useCallback((format: ExportFormat) => {
+    setState((current) => ({
+      ...current,
+      exportGeneration: {
+        selectedFormat: format,
+        status: 'generating',
+        progressPercent: 0,
+        generatedArtifact: null,
+        downloadMessage: null,
+      },
+    }))
+  }, [])
+
+  const setExportProgress = useCallback((value: number) => {
+    setState((current) => {
+      if (current.exportGeneration.status !== 'generating') {
+        return current
+      }
+
+      const progressPercent = Math.max(0, Math.min(100, Math.round(value)))
+      if (current.exportGeneration.progressPercent === progressPercent) {
+        return current
+      }
+
+      return {
+        ...current,
+        exportGeneration: {
+          ...current.exportGeneration,
+          progressPercent,
+        },
+      }
+    })
+  }, [])
+
+  const completeExportGeneration = useCallback((branch: DemoDocumentType) => {
+    setState((current) => {
+      const format = current.exportGeneration.selectedFormat
+      if (!format) {
+        return current
+      }
+
+      const artifact = createExportArtifact(format)
+
+      return {
+        ...current,
+        exportGeneration: {
+          selectedFormat: format,
+          status: 'ready',
+          progressPercent: 100,
+          generatedArtifact: artifact,
+          downloadMessage: null,
+        },
+        recentOperations: appendOperation(
+          current,
+          createOperation(
+            branch,
+            `Сформирован ${format}`,
+            branch === 'kp'
+              ? `Подготовлен демонстрационный экспорт коммерческого предложения в формате ${format}.`
+              : `Подготовлен демонстрационный экспорт технического задания в формате ${format}.`,
+          ),
+        ),
+      }
+    })
+  }, [])
+
+  const showDownloadMessage = useCallback(() => {
+    setState((current) => {
+      const format = current.exportGeneration.generatedArtifact?.format ?? current.exportGeneration.selectedFormat
+      if (!format) {
+        return current
+      }
+
+      return {
+        ...current,
+        exportGeneration: {
+          ...current.exportGeneration,
+          downloadMessage: `В демо здесь начнётся скачивание ${format}.`,
+        },
+      }
+    })
+  }, [])
+
+  const resetExportGeneration = useCallback(() => {
+    setState((current) => ({
+      ...current,
+      exportGeneration: createEmptyExportGeneration(),
+    }))
   }, [])
 
   const setBranchStage = useCallback((branch: DemoDocumentType, stageId: DemoWorkflowStageId) => {
@@ -787,16 +979,20 @@ export function DemoProvider({ children }: PropsWithChildren) {
       startPipeline,
       applyDemoVariant,
       startRun,
-      skipRun,
+      abortRun,
       completeRun,
       updateField,
+      updateOfferItem,
       selectDocumentType,
       selectSection,
       focusIssue,
       openSectionFromSource,
-      registerExport,
-      closeExportPreview,
-      sendForSignature,
+      updateExportField,
+      startExportGeneration,
+      setExportProgress,
+      completeExportGeneration,
+      showDownloadMessage,
+      resetExportGeneration,
       setBranchStage,
       markStageComplete,
       selectSourceKp,
@@ -810,16 +1006,20 @@ export function DemoProvider({ children }: PropsWithChildren) {
       startPipeline,
       applyDemoVariant,
       startRun,
-      skipRun,
+      abortRun,
       completeRun,
       updateField,
+      updateOfferItem,
       selectDocumentType,
       selectSection,
       focusIssue,
       openSectionFromSource,
-      registerExport,
-      closeExportPreview,
-      sendForSignature,
+      updateExportField,
+      startExportGeneration,
+      setExportProgress,
+      completeExportGeneration,
+      showDownloadMessage,
+      resetExportGeneration,
       setBranchStage,
       markStageComplete,
       selectSourceKp,

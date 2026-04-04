@@ -1,7 +1,16 @@
-import { FileSpreadsheet, FileText, Sparkles } from 'lucide-react'
+import { FileText, Sparkles } from 'lucide-react'
 import { brandConfig } from '../config/brand'
 import { renderTemplate } from '../lib/utils'
-import type { DemoDocumentType, DraftField, DraftSection } from '../types/demo'
+import type {
+  DemoDocumentType,
+  DemoOfferTable,
+  DraftCellAnnotation,
+  DraftCellId,
+  DraftField,
+  DraftSection,
+  OfferItemEditableField,
+} from '../types/demo'
+import { KpOfferTableEditor } from './KpOfferTableEditor'
 import { Panel, StatusPill } from './ui'
 
 const documentLabels: Record<DemoDocumentType, string> = {
@@ -12,20 +21,41 @@ const documentLabels: Record<DemoDocumentType, string> = {
 export function DocumentPreview({
   documentType,
   sections,
+  offerTable,
   fields,
+  cellAnnotations = {},
   pipelineName,
   selectedSectionId,
   onSelectSection,
+  onUpdateOfferItem,
+  onUpdateField,
   readOnly = false,
 }: {
   documentType: DemoDocumentType
   sections: DraftSection[]
+  offerTable?: DemoOfferTable | null
   fields: DraftField[]
+  cellAnnotations?: Partial<Record<DraftCellId, DraftCellAnnotation>>
   pipelineName: string
   selectedSectionId: string
   onSelectSection?: (sectionId: string) => void
+  onUpdateOfferItem?: (itemId: string, field: OfferItemEditableField, value: string) => void
+  onUpdateField?: (fieldId: DraftField['id'], value: string) => void
   readOnly?: boolean
 }) {
+  if (documentType === 'kp') {
+    return (
+      <KpOfferTableEditor
+        offerTable={offerTable ?? null}
+        fields={fields}
+        cellAnnotations={cellAnnotations}
+        editable={!readOnly}
+        onUpdateOfferItem={onUpdateOfferItem}
+        onUpdateField={onUpdateField}
+      />
+    )
+  }
+
   const filledFields = fields.filter((field) => field.value.trim())
 
   return (
@@ -43,9 +73,6 @@ export function DocumentPreview({
               </h2>
               <p className="mt-1 max-w-3xl text-sm text-[var(--ink-700)]">
                 Пайплайн: <span className="font-semibold text-[var(--ink-950)]">{pipelineName}</span>
-              </p>
-              <p className="mt-2 max-w-3xl text-sm text-[var(--ink-700)]">
-                Рабочая версия документа показывает только обезличённые данные и безопасные формулировки.
               </p>
             </div>
           </div>
@@ -86,7 +113,7 @@ export function DocumentPreview({
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-[var(--ink-500)]">
-                    {documentType === 'kp' ? <FileSpreadsheet size={16} /> : <FileText size={16} />}
+                    <FileText size={16} />
                     <span className="text-xs font-semibold uppercase tracking-[0.16em]">
                       {documentLabels[documentType]}
                     </span>
@@ -122,8 +149,7 @@ export function DocumentPreview({
           ))
         ) : (
           <Panel className="rounded-[24px] border border-dashed border-[var(--border-strong)] bg-[rgba(18,30,44,0.72)] p-6 text-sm leading-7 text-[var(--ink-700)]">
-            После нажатия на «Демонстрационный вариант» здесь появится обезличенный черновик документа с
-            секциями, источниками и формулировками для показа.
+            Пока пусто.
           </Panel>
         )}
       </div>

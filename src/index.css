@@ -90,9 +90,14 @@ textarea {
   height: 10px;
 }
 
+::-webkit-scrollbar-track {
+  background: var(--page-bg-secondary);
+}
+
 ::-webkit-scrollbar-thumb {
   background: rgba(109, 129, 150, 0.42);
   border-radius: 999px;
+  border: 2px solid var(--page-bg-secondary);
 }
 
 .paper-grid {

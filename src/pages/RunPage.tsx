@@ -1,35 +1,124 @@
 import { useEffect, useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
-import { ArrowRight, Clock3, LoaderCircle, Sparkles, TimerOff } from 'lucide-react'
+import { AlertTriangle, ArrowRight, CheckCircle2, Square } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { resolveRunStages } from '../data/demoData'
-import { Button, Eyebrow, Panel, ProgressBar, StatusPill } from '../components/ui'
+import { Button, Eyebrow, Panel, ProgressBar, StatusPill, buttonStyles } from '../components/ui'
 import { useDemo } from '../context/DemoContext'
-import { approvePath, draftPath } from '../lib/routes'
-import type { DemoDocumentType, DemoPageKey } from '../types/demo'
+import { draftPath } from '../lib/routes'
+import { getWorkflowStages } from '../lib/workflow'
+import type { DemoDocumentType, DemoPageKey, DemoStage } from '../types/demo'
 
 function resolveRunPageKey(branch: DemoDocumentType): DemoPageKey {
   return branch === 'kp' ? 'kp-run' : 'tz-run'
 }
 
+function hasText(value: string | null | undefined) {
+  return Boolean(value?.trim())
+}
+
+const stageDisplayByBranch: Record<
+  DemoDocumentType,
+  Array<{ title: string; summary: string; details: string }>
+> = {
+  kp: [
+    {
+      title: 'Запуск и очередь',
+      summary: 'Создаём run и передаём задачу оркестратору.',
+      details: 'Система фиксирует запуск, проверяет комплект входных данных и готовит пайплайн к выполнению.',
+    },
+    {
+      title: 'Нормализация контекста',
+      summary: 'Сводим потребность, фото и комментарии в общий контекст кейса.',
+      details: 'Это соответствует этапу context merge из MVP: входные становятся единым набором данных для агентов.',
+    },
+    {
+      title: 'Поиск нормативов',
+      summary: 'RAG подбирает применимые нормы и фрагменты с источниками.',
+      details: 'Нормативный слой ищет опору для дальнейших выводов и оставляет только пригодные для использования основания.',
+    },
+    {
+      title: 'Цены и номенклатура',
+      summary: 'Собираем товарную часть для коммерческого предложения.',
+      details: 'Подтягиваются позиции и ценовая логика, чтобы КП собиралось уже с коммерческой основой.',
+    },
+    {
+      title: 'Генерация черновика',
+      summary: 'Собираем рабочий draft КП по секциям.',
+      details: 'Документогенерация формирует обезличенный черновик, который потом откроется в редакторе.',
+    },
+    {
+      title: 'QA и контроль',
+      summary: 'Проверяем конфликты, пробелы и подозрительные места.',
+      details: 'Перед показом пользователю пайплайн отмечает зоны, где нужен human review.',
+    },
+  ],
+  tz: [
+    {
+      title: 'Запуск и очередь',
+      summary: 'Создаём run и передаём задачу оркестратору.',
+      details: 'Система фиксирует запуск, проверяет комплект входных данных и готовит пайплайн к выполнению.',
+    },
+    {
+      title: 'Анализ фото и замеров',
+      summary: 'Собираем измеримые признаки объекта.',
+      details: 'Vision-часть и технические вводные извлекают из материалов всё, что влияет на draft ТЗ.',
+    },
+    {
+      title: 'Нормализация контекста',
+      summary: 'Собираем основу, адаптацию и параметры в единый контекст.',
+      details: 'Это соответствует этапу context merge из MVP: входные становятся структурой для следующих шагов.',
+    },
+    {
+      title: 'Поиск нормативов',
+      summary: 'RAG подбирает применимые нормы и фрагменты с источниками.',
+      details: 'Нормативный слой ищет опору для технических требований и будущих формулировок.',
+    },
+    {
+      title: 'Генерация черновика',
+      summary: 'Собираем рабочий draft ТЗ по секциям.',
+      details: 'Документогенерация формирует обезличенный черновик, который потом откроется в редакторе.',
+    },
+    {
+      title: 'QA и контроль',
+      summary: 'Проверяем пробелы, конфликты и сомнительные места.',
+      details: 'Перед показом пользователю пайплайн отмечает зоны, где нужен human review.',
+    },
+  ],
+}
+
+function mapStagesForDisplay(branch: DemoDocumentType, stages: DemoStage[]) {
+  const displayStages = stageDisplayByBranch[branch]
+
+  return stages.map((stage, index) => ({
+    ...stage,
+    title: displayStages[index]?.title ?? stage.title,
+    summary: displayStages[index]?.summary ?? stage.summary,
+    details: displayStages[index]?.details ?? stage.details,
+  }))
+}
+
 export function RunPage() {
   const { branch, runId } = useParams()
   const [now, setNow] = useState(() => Date.now())
+  const [launchWarning, setLaunchWarning] = useState<string | null>(null)
   const {
-    state: { cases, run, selectedSourceKpId, branchLaunch, demoAppliedByPage },
+    state: { cases, run, selectedSourceKpId, demoAppliedByPage },
     applyDemoVariant,
     startRun,
-    skipRun,
+    abortRun,
     completeRun,
   } = useDemo()
 
   const isValidBranch = branch === 'kp' || branch === 'tz'
   const activeBranch = (isValidBranch ? branch : 'kp') as DemoDocumentType
-  const demoCase = cases.find((demoCase) => demoCase.id === run.caseId) ?? cases[0]
+  const demoCase = cases.find((item) => item.id === run.caseId) ?? cases[0]
   const pageKey = resolveRunPageKey(activeBranch)
   const hasDemoVariant = !!demoAppliedByPage[pageKey]
-  const pipelineName = branchLaunch[activeBranch].pipelineName
   const resolved = useMemo(() => resolveRunStages(run, activeBranch, now), [activeBranch, now, run])
+  const displayStages = useMemo(
+    () => mapStagesForDisplay(activeBranch, resolved.stages),
+    [activeBranch, resolved.stages],
+  )
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -44,7 +133,7 @@ export function RunPage() {
       return
     }
 
-    if (run.status !== 'completed' && resolved.isComplete) {
+    if (run.status === 'running' && resolved.isComplete) {
       completeRun(activeBranch)
     }
   }, [activeBranch, completeRun, hasDemoVariant, isValidBranch, resolved.isComplete, run.status])
@@ -57,244 +146,191 @@ export function RunPage() {
     return null
   }
 
-  const selectedSourceLabel = selectedSourceKpId ? 'Выбрана демонстрационная основа' : 'Основа не выбрана'
-  const activeStage = resolved.activeStage
+  const preRunStages = getWorkflowStages(activeBranch).filter(
+    (stage) => stage.id !== 'run' && stage.id !== 'editor' && stage.id !== 'export',
+  )
+  const stageCompletion = preRunStages.map((stage) => {
+    let isFilled = false
 
-  function handleDemoActivation() {
-    applyDemoVariant(pageKey)
+    if (activeBranch === 'kp') {
+      if (stage.id === 'need') isFilled = hasText(demoCase.kpRequestSummary)
+      if (stage.id === 'materials') isFilled = demoCase.kpMaterials.length > 0
+      if (stage.id === 'comments') isFilled = hasText(demoCase.kpContextNotes)
+    } else {
+      if (stage.id === 'source') isFilled = Boolean(selectedSourceKpId)
+      if (stage.id === 'need') isFilled = hasText(demoCase.tzRequestSummary)
+      if (stage.id === 'comments') {
+        isFilled =
+          hasText(demoCase.tzTechnicalNotes) ||
+          demoCase.tzMeasurements.some((measurement) => hasText(measurement.value))
+      }
+    }
+
+    return {
+      ...stage,
+      isFilled,
+    }
+  })
+
+  const completedInputCount = stageCompletion.filter((stage) => stage.isFilled).length
+  const needStage = stageCompletion.find((stage) => stage.id === 'need')
+  const activeStage = displayStages.find((stage) => stage.status === 'in_progress') ?? null
+  const isRunning = run.status === 'running'
+  const isAborted = run.status === 'aborted'
+  const totalPercent = Math.round(resolved.totalProgress * 100)
+
+  const stagePercents = displayStages.map((stage) => ({
+    ...stage,
+    percent:
+      stage.status === 'completed'
+        ? 100
+        : stage.status === 'in_progress'
+          ? Math.round((stage.progress ?? 0) * 100)
+          : 0,
+  }))
+
+  function handleRunConfirmation() {
+    if (!needStage?.isFilled) {
+      setLaunchWarning('Заполните раздел «Потребность», чтобы запустить сборку.')
+      return
+    }
+
+    setLaunchWarning(null)
+
+    if (!hasDemoVariant) {
+      applyDemoVariant(pageKey)
+    }
+
     startRun(run.id, activeBranch)
   }
 
+  const statusTitle = resolved.isComplete
+    ? 'Черновик собран'
+    : isAborted
+      ? 'Сборка остановлена'
+      : activeStage?.title ?? 'Готово к запуску'
+
   return (
-    <div className="space-y-6">
-      <Panel className="rounded-[34px] p-6 md:p-8">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr),340px]">
-          <div className="space-y-5">
-            <Eyebrow>{activeBranch === 'kp' ? 'Сборка КП' : 'Сборка ТЗ'}</Eyebrow>
-            <div>
-              <h2 className="text-4xl font-semibold tracking-tight text-[var(--ink-950)]">
-                {pipelineName}
-              </h2>
-              <p className="mt-3 max-w-3xl text-base leading-8 text-[var(--ink-800)]">
-                {activeBranch === 'kp'
-                  ? 'Экран сборки теперь не показывает готовый наполненный результат сразу. Пользователь видит нейтральное состояние и сам решает, когда показать демонстрационный пример процесса.'
-                  : 'Для ТЗ экран сборки тоже стартует пустым: только после отдельного демо-клика появляется пример прогресса и итогового сценария.'}
-              </p>
+    <div className="space-y-5">
+      <Panel className="rounded-[34px] p-5 md:p-6">
+        <div className="space-y-4">
+          <Eyebrow>{activeBranch === 'kp' ? 'Сборка КП' : 'Сборка ТЗ'}</Eyebrow>
+
+          <div className="rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-strong)] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm font-semibold text-[var(--ink-950)]">Проверка заполнения</div>
+              <StatusPill tone={completedInputCount > 0 ? 'ready' : 'low'}>
+                {completedInputCount} из {stageCompletion.length}
+              </StatusPill>
             </div>
 
-            {hasDemoVariant ? (
-              <div className="rounded-[28px] border border-[var(--border-soft)] bg-[var(--surface-strong)] p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm text-[var(--ink-700)]">Текущий статус</div>
-                    <div className="mt-1 text-2xl font-semibold text-[var(--ink-950)]">
-                      {activeStage?.title ?? 'Подготовка сценария'}
-                    </div>
-                  </div>
-                  <StatusPill tone={resolved.isComplete ? 'ready' : 'progress'}>
-                    {resolved.isComplete ? 'Готово' : 'Идёт сборка'}
-                  </StatusPill>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {stageCompletion.map((stage) => (
+                <div
+                  key={stage.id}
+                  className={
+                    stage.isFilled
+                      ? 'inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 text-sm text-[var(--ink-950)]'
+                      : 'inline-flex items-center gap-2 rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1.5 text-sm text-[var(--ink-950)]'
+                  }
+                >
+                  {stage.isFilled ? (
+                    <CheckCircle2 size={14} className="text-emerald-300" />
+                  ) : (
+                    <AlertTriangle size={14} className="text-amber-300" />
+                  )}
+                  {stage.label}
                 </div>
+              ))}
+            </div>
 
-                <div className="mt-4">
-                  <ProgressBar value={resolved.totalProgress} />
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <Button variant="secondary" onClick={() => skipRun(activeBranch)}>
-                    <TimerOff size={16} />
-                    Пропустить анимацию
-                  </Button>
-                  <Link
-                    to={draftPath(activeBranch, demoCase.draftId)}
-                    className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--brand-700)]"
-                  >
-                    Открыть редактор
-                    <ArrowRight size={15} />
-                  </Link>
-                </div>
+            {launchWarning ? (
+              <div className="mt-3 rounded-[18px] border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                {launchWarning}
               </div>
-            ) : (
-              <div className="rounded-[28px] border border-dashed border-[var(--border-strong)] bg-[var(--surface-strong)] p-6">
-                <div className="text-lg font-semibold text-[var(--ink-950)]">Сборка ещё не показана в демо</div>
-                <div className="mt-2 max-w-3xl text-sm leading-7 text-[var(--ink-700)]">
-                  В рабочем продукте здесь будет идти сборка черновика по введённым данным. Для демонстрации
-                  можно отдельной кнопкой запустить безопасный пример процесса без подстановки персональных данных.
-                </div>
-                <Button className="mt-5" variant="secondary" onClick={handleDemoActivation}>
-                  <Sparkles size={16} />
-                  Демонстрационный вариант
-                </Button>
-              </div>
-            )}
+            ) : null}
           </div>
 
-          <div className="rounded-[30px] border border-[var(--border-soft)] bg-[var(--surface-strong)] p-5">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-[rgba(78,149,188,0.12)] p-3 text-[var(--brand-700)]">
-                <Sparkles size={20} />
-              </div>
+          <div className="rounded-[28px] border border-[var(--border-soft)] bg-[var(--surface-strong)] p-4 md:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="font-semibold text-[var(--ink-950)]">Что появится на выходе</div>
-                <div className="text-sm text-[var(--ink-700)]">
-                  {activeBranch === 'kp'
-                    ? 'Обезличенный черновик коммерческого предложения'
-                    : 'Обезличенный черновик технического задания'}
+                <div className="text-sm text-[var(--ink-700)]">Текущий статус</div>
+                <div className="mt-1 text-xl font-semibold text-[var(--ink-950)] md:text-2xl">
+                  {statusTitle}
                 </div>
               </div>
+              <StatusPill
+                tone={resolved.isComplete ? 'ready' : isAborted ? 'attention' : 'progress'}
+              >
+                {resolved.isComplete ? 'Готово' : isAborted ? 'Прервано' : 'Идёт сборка'}
+              </StatusPill>
             </div>
 
-            <div className="mt-5 space-y-3 text-sm leading-7 text-[var(--ink-800)]">
-              <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-3">
-                Пайплайн: <span className="font-semibold text-[var(--ink-950)]">{pipelineName}</span>
-              </div>
-              <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-3">
-                Ветка: <span className="font-semibold text-[var(--ink-950)]">{activeBranch === 'kp' ? 'КП' : 'ТЗ'}</span>
-              </div>
-              {activeBranch === 'tz' ? (
-                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-3">
-                  Основа: <span className="font-semibold text-[var(--ink-950)]">{selectedSourceLabel}</span>
+            <div className="mt-4">
+              <ProgressBar value={resolved.totalProgress} />
+            </div>
+
+            <div className="mt-3 grid gap-2 lg:grid-cols-2 2xl:grid-cols-3">
+              {stagePercents.map((stage) => (
+                <div
+                  key={stage.id}
+                  className="rounded-[20px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-3 py-3"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-medium text-[var(--ink-950)]">{stage.title}</div>
+                    <div className="text-sm font-semibold text-[var(--brand-700)]">{stage.percent}%</div>
+                  </div>
+                  <div className="mt-2">
+                    <ProgressBar value={stage.percent / 100} />
+                  </div>
                 </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <div className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-2 text-sm text-[var(--ink-700)]">
+                Общий прогресс: {totalPercent}%
+              </div>
+
+              {isRunning ? (
+                <>
+                  <Button variant="secondary" onClick={() => abortRun(activeBranch)}>
+                    <Square size={14} />
+                    {'Прервать'}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="px-3 py-2 text-xs"
+                    onClick={() => completeRun(activeBranch)}
+                  >
+                    {'Пропустить загрузку'}
+                  </Button>
+                </>
+              ) : (
+                <Button onClick={handleRunConfirmation}>
+                  <CheckCircle2 size={16} />
+                  {isAborted
+                    ? 'Запустить снова'
+                    : hasDemoVariant
+                      ? 'Запустить'
+                      : 'Подтвердить'}
+                </Button>
+              )}
+
+              {resolved.isComplete ? (
+                <Link
+                  to={draftPath(activeBranch, demoCase.draftId)}
+                  className={buttonStyles()}
+                >
+                  {'Перейти в редактор'}
+                  <ArrowRight size={15} />
+                </Link>
               ) : null}
             </div>
           </div>
         </div>
       </Panel>
 
-      {hasDemoVariant ? (
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr),360px]">
-          <Panel className="rounded-[34px] p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <Eyebrow>Pipeline monitor</Eyebrow>
-                <h3 className="mt-3 text-2xl font-semibold text-[var(--ink-950)]">
-                  {activeBranch === 'kp'
-                    ? 'Видно, как коммерческий черновик собирается шаг за шагом'
-                    : 'Видно, как черновик ТЗ формируется из обезличённых данных'}
-                </h3>
-              </div>
-              <div className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-2 text-sm text-[var(--ink-700)]">
-                Возврат к любому этапу доступен через stepper сверху
-              </div>
-            </div>
-
-            <div className="mt-6 space-y-4">
-              {resolved.stages.map((stage, index) => (
-                <motion.div
-                  key={stage.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.04 }}
-                  className="rounded-[28px] border border-[var(--border-soft)] bg-[var(--surface-muted)] p-5"
-                >
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[rgba(78,149,188,0.14)] text-sm font-semibold text-[var(--brand-700)]">
-                          {index + 1}
-                        </span>
-                        <div>
-                          <div className="font-semibold text-[var(--ink-950)]">{stage.title}</div>
-                          <div className="text-sm text-[var(--ink-700)]">{stage.summary}</div>
-                        </div>
-                      </div>
-                      <p className="text-sm leading-7 text-[var(--ink-800)]">{stage.details}</p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <div className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-strong)] px-3 py-1 text-xs font-semibold text-[var(--ink-700)]">
-                        {stage.durationLabel}
-                      </div>
-                      <StatusPill
-                        tone={
-                          stage.status === 'completed'
-                            ? 'ready'
-                            : stage.status === 'in_progress'
-                              ? 'progress'
-                              : 'low'
-                        }
-                      >
-                        {stage.status === 'completed'
-                          ? 'Готово'
-                          : stage.status === 'in_progress'
-                            ? 'В работе'
-                            : 'Ожидает'}
-                      </StatusPill>
-                    </div>
-                  </div>
-
-                  <div className="mt-4">
-                    <ProgressBar
-                      value={
-                        stage.status === 'completed'
-                          ? 1
-                          : stage.status === 'in_progress'
-                            ? resolved.stages.find((item) => item.id === stage.id)?.progress ?? 0.25
-                            : 0
-                      }
-                    />
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </Panel>
-
-          <div className="space-y-6">
-            <Panel className="rounded-[30px] p-5">
-              <div className="flex items-center gap-3">
-                <div className="rounded-2xl bg-[rgba(208,154,58,0.14)] p-3 text-[var(--surface-dark)]">
-                  <Clock3 size={20} />
-                </div>
-                <div>
-                  <div className="font-semibold text-[var(--ink-950)]">Как это показать в демо</div>
-                  <div className="text-sm text-[var(--ink-700)]">
-                    {activeBranch === 'kp'
-                      ? 'Сценарий ведёт к черновику КП без мгновенной подстановки кейса'
-                      : 'Сценарий демонстрирует путь от вводных к черновику ТЗ'}
-                  </div>
-                </div>
-              </div>
-              <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--ink-800)]">
-                <li>1. Сначала пользователь проходит пустые этапы и при желании включает локальные демо-заглушки.</li>
-                <li>2. Затем на этом экране вручную запускает демонстрацию процесса сборки.</li>
-                <li>3. После сборки можно сразу открыть редактор или перейти к экрану согласования.</li>
-              </ul>
-            </Panel>
-
-            <Panel className="rounded-[30px] p-5">
-              <div className="flex items-center gap-3">
-                <LoaderCircle size={18} className="text-[var(--brand-700)]" />
-                <div className="font-semibold text-[var(--ink-950)]">Что делать дальше</div>
-              </div>
-              <div className="mt-4 flex flex-col gap-3">
-                <Link
-                  to={draftPath(activeBranch, demoCase.draftId)}
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-2.5 text-sm font-semibold text-[var(--ink-950)]"
-                >
-                  Открыть редактор
-                  <ArrowRight size={15} />
-                </Link>
-                <Link
-                  to={approvePath(activeBranch, demoCase.approvalId)}
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--border-soft)] bg-transparent px-4 py-2.5 text-sm font-semibold text-[var(--ink-700)]"
-                >
-                  Сразу показать итог на согласовании
-                </Link>
-              </div>
-            </Panel>
-          </div>
-        </section>
-      ) : (
-        <Panel className="rounded-[34px] p-8">
-          <div className="max-w-3xl">
-            <div className="text-2xl font-semibold text-[var(--ink-950)]">Нейтральное состояние экрана сборки</div>
-            <p className="mt-3 text-base leading-8 text-[var(--ink-800)]">
-              Здесь пока нет заранее подставленного таймлайна, готового документа или реального кейса. После
-              нажатия на «Демонстрационный вариант» можно показать пример прогресса и затем перейти в редактор.
-            </p>
-          </div>
-        </Panel>
-      )}
     </div>
   )
 }

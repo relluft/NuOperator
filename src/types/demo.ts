@@ -1,7 +1,6 @@
 export type StageStatus = 'pending' | 'in_progress' | 'completed'
 export type DemoDocumentType = 'kp' | 'tz'
-export type ApprovalState = 'needs_review' | 'ready' | 'approved'
-export type ExportFormat = 'DOCX' | 'PDF'
+export type ExportFormat = 'DOCX' | 'PDF' | 'XLSX'
 export type QASeverity = 'high' | 'medium' | 'low'
 export type CaseBadgeTone = 'ready' | 'progress' | 'attention'
 export type DemoWorkflowStageId =
@@ -11,6 +10,7 @@ export type DemoWorkflowStageId =
   | 'comments'
   | 'run'
   | 'editor'
+  | 'export'
 
 export type DemoPageKey =
   | 'kp-need'
@@ -18,13 +18,13 @@ export type DemoPageKey =
   | 'kp-comments'
   | 'kp-run'
   | 'kp-draft'
-  | 'kp-approve'
+  | 'kp-export'
   | 'tz-source'
   | 'tz-need'
   | 'tz-comments'
   | 'tz-run'
   | 'tz-draft'
-  | 'tz-approve'
+  | 'tz-export'
 
 export interface DemoAsset {
   id: string
@@ -64,7 +64,7 @@ export interface DemoCase {
   tzMeasurements: DemoMeasurement[]
   runId: string
   draftId: string
-  approvalId: string
+  exportId: string
   isAnchor?: boolean
 }
 
@@ -82,7 +82,7 @@ export interface DemoStage {
 export interface DemoRun {
   id: string
   caseId: string
-  status: 'idle' | 'running' | 'completed'
+  status: 'idle' | 'running' | 'completed' | 'aborted'
   startedAt: number | null
   completedAt: number | null
   stages: DemoStage[]
@@ -102,6 +102,43 @@ export interface DraftSection {
   documentType: DemoDocumentType
   content: string[]
   stats?: Array<{ label: string; value: string }>
+  table?: {
+    title: string
+    columns: string[]
+    rows: string[][]
+  }
+}
+
+export interface DemoOfferTableItem {
+  id: string
+  description: string
+  quantity: number
+  unitPrice: number
+  installationUnitPrice: number
+}
+
+export type OfferItemEditableField =
+  | 'description'
+  | 'quantity'
+  | 'unitPrice'
+  | 'installationUnitPrice'
+
+export type OfferItemComputedField = 'productTotal' | 'installationTotal' | 'grandTotal'
+
+export type OfferItemField = OfferItemEditableField | OfferItemComputedField
+
+export interface DemoOfferTableTotal {
+  id: string
+  label: string
+  productTotal?: number
+  installationTotal?: number
+  grandTotal: number
+  tone?: 'subtotal' | 'service' | 'final'
+}
+
+export interface DemoOfferTable {
+  items: DemoOfferTableItem[]
+  totals: DemoOfferTableTotal[]
 }
 
 export interface SourceLink {
@@ -111,6 +148,30 @@ export interface SourceLink {
   excerpt: string
   relatedSectionId: string
   confidence: 'high' | 'medium'
+}
+
+export type DraftCellId =
+  | `kp-item:${string}:${OfferItemField}`
+  | `kp-total:${string}`
+  | `kp-field:${DraftField['id']}`
+
+export interface DraftCellSource {
+  label: string
+  sourceType: SourceLink['sourceType']
+  excerpt: string
+  confidence: SourceLink['confidence']
+}
+
+export interface DraftCellIssue {
+  severity: QASeverity
+  title: string
+  summary: string
+}
+
+export interface DraftCellAnnotation {
+  cellId: DraftCellId
+  sources: DraftCellSource[]
+  issue?: DraftCellIssue
 }
 
 export interface QAFlag {
@@ -134,10 +195,28 @@ export interface DemoDraft {
   caseId: string
   documentType: DemoDocumentType
   sections: DraftSection[]
+  offerTable: DemoOfferTable | null
   fields: DraftField[]
+  cellAnnotations: Partial<Record<DraftCellId, DraftCellAnnotation>>
   issues: QAFlag[]
   sources: SourceLink[]
-  approvalState: ApprovalState
+}
+
+export interface DemoExportForm {
+  counterpartyName: string
+  counterpartyAddress: string
+  objectAddress: string
+  documentDate: string
+  signatoryName: string
+  manualNotes: string
+}
+
+export interface DemoExportGeneration {
+  selectedFormat: ExportFormat | null
+  status: 'idle' | 'generating' | 'ready'
+  progressPercent: number
+  generatedArtifact: ExportArtifact | null
+  downloadMessage: string | null
 }
 
 export interface RecentOperation {
@@ -162,12 +241,12 @@ export interface DemoState {
   cases: DemoCase[]
   run: DemoRun
   draft: DemoDraft
+  nextPipelineNumber: number
   selectedDocumentType: DemoDocumentType
   selectedSectionId: string
   focusedIssueId: string | null
-  exportArtifacts: ExportArtifact[]
-  previewArtifact: ExportArtifact | null
-  approvalSent: boolean
+  exportForm: DemoExportForm
+  exportGeneration: DemoExportGeneration
   recentOperations: RecentOperation[]
   currentBranchStage: Record<DemoDocumentType, DemoWorkflowStageId>
   branchProgress: Record<DemoDocumentType, BranchProgress>

@@ -1,18 +1,10 @@
 import { motion } from 'framer-motion'
-import {
-  ArrowRight,
-  Boxes,
-  ClipboardList,
-  FileStack,
-  MessageSquareText,
-  PackagePlus,
-  Ruler,
-  ScrollText,
-} from 'lucide-react'
+import { ArrowRight, Boxes, FileStack, MessageSquareText, Ruler, ScrollText } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import { flushSync } from 'react-dom'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
-import { getDemoSourceOptions } from '../data/demoData'
 import { Button, Eyebrow, Panel, StatusPill } from '../components/ui'
+import { getDemoSourceOptions } from '../data/demoData'
 import { useDemo } from '../context/DemoContext'
 import { caseStagePath, runPath } from '../lib/routes'
 import { formatDateTime } from '../lib/utils'
@@ -54,19 +46,44 @@ function DemoVariantButton({
   return (
     <Button
       variant="ghost"
-      className={`rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-700)] ${className}`}
+      className={`rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] ${className}`}
       onClick={onClick}
     >
-      Демонстрационный вариант
+      Демо
     </Button>
+  )
+}
+
+function StageActions({
+  onDemo,
+  onNext,
+  onGenerate,
+}: {
+  onDemo: () => void
+  onNext: () => void
+  onGenerate: () => void
+}) {
+  return (
+    <div className="mt-6 flex flex-wrap items-center gap-3">
+      <DemoVariantButton onClick={onDemo} />
+      <Button variant="secondary" onClick={onNext}>
+        Далее
+        <ArrowRight size={16} />
+      </Button>
+      <Button onClick={onGenerate}>
+        Генерация
+        <ArrowRight size={16} />
+      </Button>
+    </div>
   )
 }
 
 export function CasePage() {
   const navigate = useNavigate()
+  const kpNeedTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const { branch, caseId, stageId } = useParams()
   const {
-    state: { cases, draft, branchLaunch, selectedSourceKpId, demoAppliedByPage },
+    state: { cases, draft, selectedSourceKpId, demoAppliedByPage },
     applyDemoVariant,
     markStageComplete,
     selectSourceKp,
@@ -83,7 +100,13 @@ export function CasePage() {
   const activeBranch = branch as DemoDocumentType
   const allowedStages = getWorkflowStages(activeBranch).map((stage) => stage.id)
 
-  if (!stageId || !allowedStages.includes(stageId as never) || stageId === 'run' || stageId === 'editor') {
+  if (
+    !stageId ||
+    !allowedStages.includes(stageId as never) ||
+    stageId === 'run' ||
+    stageId === 'editor' ||
+    stageId === 'export'
+  ) {
     return <Navigate to={caseStagePath(activeBranch, caseId ?? '', activeBranch === 'kp' ? 'need' : 'source')} replace />
   }
 
@@ -97,124 +120,70 @@ export function CasePage() {
   const hasDemoVariant = !!demoAppliedByPage[pageKey]
   const currentStage = getWorkflowStage(activeBranch, stageId as never)
   const nextStage = nextStageMap[activeBranch][stageId as keyof (typeof nextStageMap)[typeof activeBranch]]
-  const pipelineName = branchLaunch[activeBranch].pipelineName
   const sourceOptions = hasDemoVariant ? getDemoSourceOptions() : []
   const selectedSource = sourceOptions.find((item) => item.id === selectedSourceKpId) ?? null
 
+  useEffect(() => {
+    if (activeBranch !== 'kp' || stageId !== 'need' || !kpNeedTextareaRef.current) {
+      return
+    }
+
+    const textarea = kpNeedTextareaRef.current
+    textarea.style.height = '0px'
+    textarea.style.height = `${textarea.scrollHeight}px`
+  }, [activeBranch, stageId, demoCase.kpRequestSummary])
+
+  function completeCurrentStage() {
+    flushSync(() => {
+      markStageComplete(activeBranch, stageId as never)
+    })
+  }
+
   function moveToNext() {
+    completeCurrentStage()
+
     if (nextStage === 'run') {
-      flushSync(() => {
-        markStageComplete(activeBranch, stageId as never)
-      })
       navigate(runPath(activeBranch, demoCase.runId))
       return
     }
 
-    flushSync(() => {
-      markStageComplete(activeBranch, stageId as never)
-    })
     navigate(caseStagePath(activeBranch, demoCase.id, nextStage))
+  }
+
+  function moveToGeneration() {
+    completeCurrentStage()
+    navigate(runPath(activeBranch, demoCase.runId))
   }
 
   return (
     <div className="space-y-6">
-      <Panel className="rounded-[34px] p-6 md:p-8">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr),320px]">
-          <div className="space-y-5">
+      {activeBranch === 'kp' && stageId === 'need' ? (
+        <section>
+          <Panel className="rounded-[34px] p-6 md:p-8">
             <Eyebrow>
               {getBranchLabel(activeBranch)} / {currentStage.label}
             </Eyebrow>
-            <div className="space-y-4">
-              <h2 className="text-4xl font-semibold tracking-tight text-[var(--ink-950)]">{pipelineName}</h2>
-              <p className="max-w-3xl text-base leading-8 text-[var(--ink-800)]">
-                {activeBranch === 'kp'
-                  ? 'Сценарий КП начинается с пустой рабочей формы: пользователь формулирует потребность, при необходимости подставляет демонстрационные материалы и только потом переходит к сборке.'
-                  : 'Сценарий ТЗ также начинается с пустых шагов: сначала выбирается обезличенная основа, затем уточняется задача и только после этого можно показать демонстрационную сборку.'}
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-[30px] border border-[var(--border-soft)] bg-[var(--surface-strong)] p-5">
-            <div className="text-sm text-[var(--ink-700)]">Сейчас заполняем</div>
-            <div className="mt-2 text-2xl font-semibold text-[var(--ink-950)]">{currentStage.label}</div>
-            <div className="mt-3 text-sm leading-7 text-[var(--ink-800)]">{currentStage.description}</div>
-
-            <div className="mt-5 rounded-[22px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-4">
-              <div className="text-xs uppercase tracking-[0.16em] text-[var(--ink-500)]">Следующий шаг</div>
-              <div className="mt-2 text-sm font-semibold text-[var(--ink-950)]">
-                {nextStage === 'run'
-                  ? activeBranch === 'kp'
-                    ? 'Сборка КП'
-                    : 'Сборка ТЗ'
-                  : getWorkflowStage(activeBranch, nextStage).label}
-              </div>
-            </div>
-
-            <Button className="mt-5 w-full justify-center" onClick={moveToNext}>
-              {nextStage === 'run'
-                ? activeBranch === 'kp'
-                  ? 'Перейти к сборке КП'
-                  : 'Перейти к сборке ТЗ'
-                : 'Сохранить и перейти дальше'}
-              <ArrowRight size={16} />
-            </Button>
-          </div>
-        </div>
-      </Panel>
-
-      {activeBranch === 'kp' && stageId === 'need' ? (
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr),320px]">
-          <Panel className="rounded-[34px] p-6 md:p-8">
-            <div className="text-center">
-              <Eyebrow>Основной ввод</Eyebrow>
-              <h3 className="mt-5 text-3xl font-semibold text-[var(--ink-950)]">Потребность заказчика</h3>
-              <p className="mx-auto mt-3 max-w-3xl text-sm leading-7 text-[var(--ink-800)]">
-                Это главный рабочий блок для демонстрации. Здесь пользователь своими словами описывает, что
-                нужно подготовить в рамках данного пайплайна.
-              </p>
-            </div>
-
-            <label className="mt-8 block">
+            <label className="block">
               <textarea
+                ref={kpNeedTextareaRef}
                 value={demoCase.kpRequestSummary}
                 onChange={(event) => updateRequestSummary('kp', event.target.value)}
                 rows={9}
-                placeholder="Введите потребность заказчика..."
-                className="w-full rounded-[28px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-5 py-5 text-base leading-8 text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
+                placeholder="Введите базовую потребность заказчика..."
+                className="w-full resize-none overflow-hidden rounded-[28px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-5 py-5 text-base leading-8 text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
               />
             </label>
-          </Panel>
-
-          <Panel className="rounded-[30px] p-5">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-[rgba(78,149,188,0.12)] p-3 text-[var(--brand-700)]">
-                <ClipboardList size={20} />
-              </div>
-              <div>
-                <div className="font-semibold text-[var(--ink-950)]">Демо для показа</div>
-                <div className="text-sm text-[var(--ink-700)]">Подставляется только по отдельной кнопке</div>
-              </div>
-            </div>
-            <div className="mt-4 rounded-[22px] border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] p-4 text-sm leading-7 text-[var(--ink-700)]">
-              На свежем старте поле остаётся пустым. Для демонстрации можно один раз подставить нейтральный
-              пример текста без персональных данных.
-            </div>
-            <DemoVariantButton className="mt-4 w-full justify-center" onClick={() => applyDemoVariant(pageKey)} />
+            <StageActions onDemo={() => applyDemoVariant(pageKey)} onNext={moveToNext} onGenerate={moveToGeneration} />
           </Panel>
         </section>
       ) : null}
 
       {activeBranch === 'kp' && stageId === 'materials' ? (
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr),320px]">
+        <section>
           <Panel className="rounded-[34px] p-6">
+            <Eyebrow>{getBranchLabel(activeBranch)} / {currentStage.label}</Eyebrow>
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-2xl font-semibold text-[var(--ink-950)]">Фото и материалы</h3>
-                <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--ink-800)]">
-                  Здесь появляются только те материалы, которые действительно нужны для подготовки КП. По
-                  умолчанию экран пустой и не показывает заглушки без явного действия пользователя.
-                </p>
-              </div>
+              <h3 className="text-2xl font-semibold text-[var(--ink-950)]">Фото и материалы</h3>
               <StatusPill tone={demoCase.kpMaterials.length ? 'ready' : 'low'}>
                 {demoCase.kpMaterials.length ? `${demoCase.kpMaterials.length} материалов` : 'Пока пусто'}
               </StatusPill>
@@ -250,80 +219,38 @@ export function CasePage() {
                   <Boxes size={24} />
                 </div>
                 <div className="mt-4 text-lg font-semibold text-[var(--ink-950)]">Материалы ещё не добавлены</div>
-                <div className="mx-auto mt-2 max-w-2xl text-sm leading-7 text-[var(--ink-700)]">
-                  В реальном сценарии сюда попадут фотографии, PDF и другие входные файлы. Для демо можно
-                  показать готовый обезличенный набор через маленькую кнопку справа.
-                </div>
               </div>
             )}
-          </Panel>
 
-          <Panel className="rounded-[30px] p-5">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-[rgba(208,154,58,0.14)] p-3 text-[var(--surface-dark)]">
-                <PackagePlus size={20} />
-              </div>
-              <div>
-                <div className="font-semibold text-[var(--ink-950)]">Демо для материалов</div>
-                <div className="text-sm text-[var(--ink-700)]">Без автоподстановки при первом открытии</div>
-              </div>
-            </div>
-            <div className="mt-4 rounded-[22px] border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] p-4 text-sm leading-7 text-[var(--ink-700)]">
-              Кнопка подставляет только текущий шаг: фотографии, файл измерений и демонстрационный пример
-              конструктивного узла.
-            </div>
-            <DemoVariantButton className="mt-4 w-full justify-center" onClick={() => applyDemoVariant(pageKey)} />
+            <StageActions onDemo={() => applyDemoVariant(pageKey)} onNext={moveToNext} onGenerate={moveToGeneration} />
           </Panel>
         </section>
       ) : null}
 
       {activeBranch === 'kp' && stageId === 'comments' ? (
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr),320px]">
+        <section>
           <Panel className="rounded-[34px] p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-2xl font-semibold text-[var(--ink-950)]">Комментарии и вводные</h3>
-                <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--ink-800)]">
-                  Здесь фиксируется свободная информация, которая имеет значение для этого конкретного пайплайна,
-                  но не относится напрямую к потребности и блоку материалов.
-                </p>
-              </div>
-              <DemoVariantButton onClick={() => applyDemoVariant(pageKey)} />
-            </div>
-
-            <label className="mt-6 block">
-              <div className="text-sm font-semibold text-[var(--ink-950)]">Свободные вводные</div>
+            <Eyebrow>{getBranchLabel(activeBranch)} / {currentStage.label}</Eyebrow>
+            <label className="block">
               <textarea
                 value={demoCase.kpContextNotes}
                 onChange={(event) => updateStageNotes('kp', event.target.value)}
                 rows={8}
-                placeholder="Напишите важные условия, ограничения или пожелания к генерации..."
-                className="mt-3 w-full rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-4 text-sm leading-7 text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
+                placeholder="Комментарии и вводные..."
+                className="w-full rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-4 text-sm leading-7 text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
               />
             </label>
-          </Panel>
-
-          <Panel className="rounded-[30px] p-5">
-            <div className="font-semibold text-[var(--ink-950)]">Что важно на этом шаге</div>
-            <div className="mt-4 rounded-[22px] border border-[var(--border-soft)] bg-[var(--surface-muted)] p-4 text-sm leading-7 text-[var(--ink-800)]">
-              В этом разделе больше нет отдельных комментариев монтажников. Пользователь пишет один
-              консолидированный текст, который программа потом учитывает при генерации.
-            </div>
+            <StageActions onDemo={() => applyDemoVariant(pageKey)} onNext={moveToNext} onGenerate={moveToGeneration} />
           </Panel>
         </section>
       ) : null}
 
       {activeBranch === 'tz' && stageId === 'source' ? (
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr),320px]">
+        <section>
           <Panel className="rounded-[34px] p-6">
+            <Eyebrow>{getBranchLabel(activeBranch)} / {currentStage.label}</Eyebrow>
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-2xl font-semibold text-[var(--ink-950)]">Основа из КП</h3>
-                <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--ink-800)]">
-                  По умолчанию экран пустой. Для демонстрации можно отдельно открыть обезличенные варианты
-                  готовой базы, на которой затем будет строиться ТЗ.
-                </p>
-              </div>
+              <h3 className="text-2xl font-semibold text-[var(--ink-950)]">Основа из КП</h3>
               <DemoVariantButton onClick={() => applyDemoVariant(pageKey)} />
             </div>
 
@@ -359,56 +286,34 @@ export function CasePage() {
                   <ScrollText size={24} />
                 </div>
                 <div className="mt-4 text-lg font-semibold text-[var(--ink-950)]">Основа пока не выбрана</div>
-                <div className="mx-auto mt-2 max-w-2xl text-sm leading-7 text-[var(--ink-700)]">
-                  Нажмите на маленькую кнопку «Демонстрационный вариант», чтобы показать типовые обезличенные
-                  карточки базы для ТЗ.
-                </div>
               </div>
             )}
-          </Panel>
 
-          <Panel className="rounded-[30px] p-5">
-            <div className="font-semibold text-[var(--ink-950)]">Выбранная основа</div>
-            <div className="mt-4 rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-muted)] p-4 text-sm leading-7 text-[var(--ink-800)]">
-              {selectedSource
-                ? `${selectedSource.title}. Эту основу можно использовать как демонстрационный старт для ТЗ.`
-                : 'Основа пока не выбрана. При необходимости можно продолжить сценарий и без неё.'}
+            <div className="mt-6 rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-muted)] p-4 text-sm leading-7 text-[var(--ink-800)]">
+              {selectedSource ? `${selectedSource.title}` : 'Можно продолжить и без основы.'}
             </div>
-            <Button className="mt-5 w-full justify-center" variant="secondary" onClick={() => selectSourceKp(null)}>
+            <Button className="mt-5" variant="ghost" onClick={() => selectSourceKp(null)}>
               Продолжить без основы
             </Button>
+            <StageActions onDemo={() => applyDemoVariant(pageKey)} onNext={moveToNext} onGenerate={moveToGeneration} />
           </Panel>
         </section>
       ) : null}
 
       {activeBranch === 'tz' && stageId === 'need' ? (
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr),320px]">
+        <section>
           <Panel className="rounded-[34px] p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-2xl font-semibold text-[var(--ink-950)]">Потребность и адаптация под ТЗ</h3>
-                <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--ink-800)]">
-                  Здесь пользователь переводит задачу в технический формат: что именно должно быть реализовано
-                  и какие результаты считаются корректными для будущего ТЗ.
-                </p>
-              </div>
-              <DemoVariantButton onClick={() => applyDemoVariant(pageKey)} />
-            </div>
-
-            <label className="mt-6 block">
-              <div className="text-sm font-semibold text-[var(--ink-950)]">Формулировка задачи для ТЗ</div>
+            <Eyebrow>{getBranchLabel(activeBranch)} / {currentStage.label}</Eyebrow>
+            <label className="block">
               <textarea
                 value={demoCase.tzRequestSummary}
                 onChange={(event) => updateRequestSummary('tz', event.target.value)}
                 rows={8}
                 placeholder="Опишите техническую цель и ожидаемый результат..."
-                className="mt-3 w-full rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-4 text-sm leading-7 text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
+                className="w-full rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-4 text-sm leading-7 text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
               />
             </label>
-          </Panel>
 
-          <Panel className="rounded-[30px] p-5">
-            <div className="font-semibold text-[var(--ink-950)]">Поля финальной упаковки</div>
             <div className="mt-4 space-y-4">
               {draft.fields.map((field) => (
                 <label key={field.id} className="block">
@@ -431,26 +336,17 @@ export function CasePage() {
                 </label>
               ))}
             </div>
+
+            <StageActions onDemo={() => applyDemoVariant(pageKey)} onNext={moveToNext} onGenerate={moveToGeneration} />
           </Panel>
         </section>
       ) : null}
 
       {activeBranch === 'tz' && stageId === 'comments' ? (
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr),320px]">
+        <section>
           <Panel className="rounded-[34px] p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-2xl font-semibold text-[var(--ink-950)]">Замеры и вводные</h3>
-                <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--ink-800)]">
-                  На этом шаге фиксируются измеримые параметры и свободные технические вводные, которые
-                  нужно учесть при сборке ТЗ.
-                </p>
-              </div>
-              <DemoVariantButton onClick={() => applyDemoVariant(pageKey)} />
-            </div>
-
             {demoCase.tzMeasurements.length ? (
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-2">
                 {demoCase.tzMeasurements.map((measurement) => (
                   <label
                     key={measurement.id}
@@ -473,30 +369,22 @@ export function CasePage() {
                 ))}
               </div>
             ) : (
-              <div className="mt-6 rounded-[26px] border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] p-6 text-sm leading-7 text-[var(--ink-700)]">
-                Измеримые параметры пока не добавлены. Для демонстрации можно подставить типовой набор замеров
-                через маленькую кнопку «Демонстрационный вариант».
+              <div className="rounded-[26px] border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] p-6 text-sm leading-7 text-[var(--ink-700)]">
+                Замеры пока не добавлены.
               </div>
             )}
 
             <label className="mt-6 block">
-              <div className="text-sm font-semibold text-[var(--ink-950)]">Технические вводные</div>
               <textarea
                 value={demoCase.tzTechnicalNotes}
                 onChange={(event) => updateStageNotes('tz', event.target.value)}
                 rows={6}
-                placeholder="Опишите дополнительные технические ограничения и условия..."
-                className="mt-3 w-full rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-4 text-sm leading-7 text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
+                placeholder="Технические вводные..."
+                className="w-full rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-4 text-sm leading-7 text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
               />
             </label>
-          </Panel>
 
-          <Panel className="rounded-[30px] p-5">
-            <div className="font-semibold text-[var(--ink-950)]">Что учитывается в ТЗ</div>
-            <div className="mt-4 rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-muted)] p-4 text-sm leading-7 text-[var(--ink-800)]">
-              Здесь нет персональных комментариев сотрудников. Пользователь вносит только проектно значимые
-              измерения и свободные технические вводные.
-            </div>
+            <StageActions onDemo={() => applyDemoVariant(pageKey)} onNext={moveToNext} onGenerate={moveToGeneration} />
           </Panel>
         </section>
       ) : null}
