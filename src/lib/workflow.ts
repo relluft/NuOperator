@@ -38,7 +38,8 @@ const workflowDefinitions: Record<DemoDocumentType, WorkflowStageDefinition[]> =
       id: 'comments',
       label: 'Комментарии',
       shortLabel: 'Вводные',
-      description: 'Сохраняем свободные важные условия, не относящиеся напрямую к потребности и материалам.',
+      description:
+        'Сохраняем свободные важные условия, не относящиеся напрямую к потребности и материалам.',
       icon: MessageSquareQuote,
     },
     {
@@ -59,7 +60,8 @@ const workflowDefinitions: Record<DemoDocumentType, WorkflowStageDefinition[]> =
       id: 'export',
       label: 'Экспорт',
       shortLabel: 'Экспорт',
-      description: 'Вносим ручные реквизиты, выбираем формат и подготавливаем финальный документ.',
+      description:
+        'Вносим ручные реквизиты, выбираем формат и подготавливаем финальный документ.',
       icon: FileOutput,
     },
   ],
@@ -75,7 +77,8 @@ const workflowDefinitions: Record<DemoDocumentType, WorkflowStageDefinition[]> =
       id: 'need',
       label: 'Потребность и адаптация',
       shortLabel: 'Адаптация',
-      description: 'Переводим задачу в формат технического сценария и уточняем цель проекта.',
+      description:
+        'Переводим задачу в формат технического сценария и уточняем цель проекта.',
       icon: ClipboardPenLine,
     },
     {

@@ -68,12 +68,14 @@ export function AppLayout() {
   return (
     <div className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-[-8%] top-[-4%] h-72 w-72 rounded-full bg-[rgba(78,149,188,0.2)] blur-3xl" />
-        <div className="absolute right-[-6%] top-20 h-80 w-80 rounded-full bg-[rgba(213,159,78,0.14)] blur-3xl" />
-        <div className="paper-grid absolute inset-0 opacity-45" />
+        <div className="ambient-orb ambient-orb-cyan absolute left-[-8%] top-[-6%] h-[24rem] w-[24rem] animate-[ambient-float_14s_ease-in-out_infinite]" />
+        <div className="ambient-orb ambient-orb-gold absolute right-[-8%] top-24 h-[26rem] w-[26rem] animate-[ambient-float_18s_ease-in-out_infinite]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,248,234,0.035),transparent_18%,transparent_82%,rgba(255,248,234,0.02))]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(199,155,88,0.08),transparent_36%)]" />
+        <div className="paper-grid absolute inset-0 opacity-30" />
       </div>
 
-      <div className="relative flex min-h-screen w-full items-start gap-4 px-3 py-4 md:px-4">
+      <div className="relative flex min-h-screen w-full items-start gap-5 px-3 py-4 md:px-4">
         <div className="hidden w-[272px] shrink-0 xl:block">
           <WorkspaceSidebar
             branch={activeBranch}
@@ -84,7 +86,7 @@ export function AppLayout() {
           />
         </div>
 
-        <div className="flex min-w-0 max-w-[1400px] flex-1 flex-col gap-4">
+        <div className="flex min-w-0 max-w-[1400px] flex-1 flex-col gap-6">
           <ProgressStepper
             branch={activeBranch}
             caseId={activeCase.id}

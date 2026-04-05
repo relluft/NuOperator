@@ -3,7 +3,7 @@ import { ArrowRight, Boxes, FileStack, MessageSquareText, Ruler, ScrollText } fr
 import { useEffect, useRef } from 'react'
 import { flushSync } from 'react-dom'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
-import { Button, Eyebrow, Panel, StatusPill } from '../components/ui'
+import { Button, Eyebrow, Panel, StatusPill, fieldStyles } from '../components/ui'
 import { getDemoSourceOptions } from '../data/demoData'
 import { useDemo } from '../context/DemoContext'
 import { caseStagePath, runPath } from '../lib/routes'
@@ -71,7 +71,7 @@ function StageActions({
         <ArrowRight size={16} />
       </Button>
       <Button onClick={onGenerate}>
-        Генерация
+        Запустить сборку
         <ArrowRight size={16} />
       </Button>
     </div>
@@ -93,49 +93,69 @@ export function CasePage() {
     updateStageNotes,
   } = useDemo()
 
-  if (branch !== 'kp' && branch !== 'tz') {
-    return <Navigate to="/workspace" replace />
-  }
-
-  const activeBranch = branch as DemoDocumentType
+  const isValidBranch = branch === 'kp' || branch === 'tz'
+  const activeBranch = (isValidBranch ? branch : 'kp') as DemoDocumentType
   const allowedStages = getWorkflowStages(activeBranch).map((stage) => stage.id)
-
-  if (
-    !stageId ||
-    !allowedStages.includes(stageId as never) ||
-    stageId === 'run' ||
-    stageId === 'editor' ||
-    stageId === 'export'
-  ) {
-    return <Navigate to={caseStagePath(activeBranch, caseId ?? '', activeBranch === 'kp' ? 'need' : 'source')} replace />
-  }
-
-  const demoCase = cases.find((item) => item.id === caseId) ?? cases.find((item) => item.isAnchor) ?? cases[0]
-
-  if (!demoCase) {
-    return <Navigate to="/workspace" replace />
-  }
-
-  const pageKey = resolvePageKey(activeBranch, stageId)
+  const isValidStage =
+    !!stageId &&
+    allowedStages.includes(stageId as never) &&
+    stageId !== 'run' &&
+    stageId !== 'editor' &&
+    stageId !== 'export'
+  const safeStageId = isValidStage ? stageId : activeBranch === 'kp' ? 'need' : 'source'
+  const demoCase =
+    cases.find((item) => item.id === caseId) ?? cases.find((item) => item.isAnchor) ?? cases[0]
+  const pageKey = resolvePageKey(activeBranch, safeStageId)
   const hasDemoVariant = !!demoAppliedByPage[pageKey]
-  const currentStage = getWorkflowStage(activeBranch, stageId as never)
-  const nextStage = nextStageMap[activeBranch][stageId as keyof (typeof nextStageMap)[typeof activeBranch]]
+  const currentStage = getWorkflowStage(activeBranch, safeStageId as never)
+  const nextStage =
+    nextStageMap[activeBranch][safeStageId as keyof (typeof nextStageMap)[typeof activeBranch]]
   const sourceOptions = hasDemoVariant ? getDemoSourceOptions() : []
   const selectedSource = sourceOptions.find((item) => item.id === selectedSourceKpId) ?? null
 
   useEffect(() => {
-    if (activeBranch !== 'kp' || stageId !== 'need' || !kpNeedTextareaRef.current) {
+    if (
+      !isValidBranch ||
+      !isValidStage ||
+      !kpNeedTextareaRef.current ||
+      activeBranch !== 'kp' ||
+      safeStageId !== 'need' ||
+      !demoCase
+    ) {
       return
     }
 
     const textarea = kpNeedTextareaRef.current
     textarea.style.height = '0px'
     textarea.style.height = `${textarea.scrollHeight}px`
-  }, [activeBranch, stageId, demoCase.kpRequestSummary])
+  }, [activeBranch, demoCase, isValidBranch, isValidStage, safeStageId])
+
+  if (!isValidBranch) {
+    return <Navigate to="/workspace" replace />
+  }
+
+  if (!isValidStage) {
+    return (
+      <Navigate
+        to={
+          caseStagePath(
+            activeBranch,
+            caseId ?? '',
+            safeStageId as Extract<ReturnType<typeof getWorkflowStages>[number]['id'], 'source' | 'need' | 'materials' | 'comments'>,
+          )
+        }
+        replace
+      />
+    )
+  }
+
+  if (!demoCase) {
+    return <Navigate to="/workspace" replace />
+  }
 
   function completeCurrentStage() {
     flushSync(() => {
-      markStageComplete(activeBranch, stageId as never)
+      markStageComplete(activeBranch, safeStageId as never)
     })
   }
 
@@ -157,100 +177,166 @@ export function CasePage() {
 
   return (
     <div className="space-y-6">
-      {activeBranch === 'kp' && stageId === 'need' ? (
+      {activeBranch === 'kp' && safeStageId === 'need' ? (
         <section>
-          <Panel className="rounded-[34px] p-6 md:p-8">
+          <Panel tone="highlight" className="rounded-[34px] p-6 md:p-8">
             <Eyebrow>
               {getBranchLabel(activeBranch)} / {currentStage.label}
             </Eyebrow>
-            <label className="block">
+            <div className="mt-5">
+              <div className="display-section-title text-3xl text-[var(--ink-950)] md:text-[2.2rem]">
+                Потребность и контекст
+              </div>
+              <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--ink-800)]">
+                Зафиксируйте исходную потребность клиента в рабочем пространстве до запуска
+                автоматизации.
+              </p>
+            </div>
+            <label className="mt-5 block">
               <textarea
                 ref={kpNeedTextareaRef}
                 value={demoCase.kpRequestSummary}
                 onChange={(event) => updateRequestSummary('kp', event.target.value)}
                 rows={9}
-                placeholder="Введите базовую потребность заказчика..."
-                className="w-full resize-none overflow-hidden rounded-[28px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-5 py-5 text-base leading-8 text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
+                placeholder="Опишите потребность клиента..."
+                className={`w-full resize-none overflow-hidden rounded-[28px] px-5 py-5 text-base leading-8 ${fieldStyles}`}
               />
             </label>
-            <StageActions onDemo={() => applyDemoVariant(pageKey)} onNext={moveToNext} onGenerate={moveToGeneration} />
+            <StageActions
+              onDemo={() => applyDemoVariant(pageKey)}
+              onNext={moveToNext}
+              onGenerate={moveToGeneration}
+            />
           </Panel>
         </section>
       ) : null}
 
-      {activeBranch === 'kp' && stageId === 'materials' ? (
+      {activeBranch === 'kp' && safeStageId === 'materials' ? (
         <section>
           <Panel className="rounded-[34px] p-6">
-            <Eyebrow>{getBranchLabel(activeBranch)} / {currentStage.label}</Eyebrow>
-            <div className="flex items-start justify-between gap-4">
-              <h3 className="text-2xl font-semibold text-[var(--ink-950)]">Фото и материалы</h3>
+            <Eyebrow>
+              {getBranchLabel(activeBranch)} / {currentStage.label}
+            </Eyebrow>
+            <div className="mt-5 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="display-section-title text-3xl text-[var(--ink-950)]">
+                  Фото и материалы
+                </h3>
+                <p className="mt-2 text-sm leading-7 text-[var(--ink-800)]">
+                  Визуальные и файловые материалы представлены как аккуратная галерея без изменения
+                  структуры процесса.
+                </p>
+              </div>
               <StatusPill tone={demoCase.kpMaterials.length ? 'ready' : 'low'}>
-                {demoCase.kpMaterials.length ? `${demoCase.kpMaterials.length} материалов` : 'Пока пусто'}
+                {demoCase.kpMaterials.length ? `${demoCase.kpMaterials.length} материалов` : 'Пусто'}
               </StatusPill>
             </div>
 
             {demoCase.kpMaterials.length ? (
               <div className="mt-6 grid gap-4 md:grid-cols-2">
                 {demoCase.kpMaterials.map((asset) => (
-                  <motion.div key={asset.id} whileHover={{ y: -4 }} transition={{ duration: 0.2 }}>
-                    <div className="overflow-hidden rounded-[28px] border border-[var(--border-soft)] bg-[var(--surface-muted)]">
-                      <div className="aspect-[1.18] bg-[rgba(78,149,188,0.1)]">
+                  <motion.div
+                    key={asset.id}
+                    whileHover={{ y: -4 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <div className="executive-card overflow-hidden rounded-[28px]">
+                      <div className="aspect-[1.18] bg-[linear-gradient(180deg,rgba(214,173,107,0.14),rgba(255,248,234,0.03))]">
                         {asset.previewUrl ? (
-                          <img src={asset.previewUrl} alt={asset.title} className="h-full w-full object-cover" />
+                          <img
+                            src={asset.previewUrl}
+                            alt={asset.title}
+                            className="h-full w-full object-cover"
+                          />
                         ) : (
                           <div className="flex h-full items-center justify-center text-[var(--brand-700)]">
-                            {asset.kind === 'chat' ? <MessageSquareText size={34} /> : <FileStack size={34} />}
+                            {asset.kind === 'chat' ? (
+                              <MessageSquareText size={34} />
+                            ) : (
+                              <FileStack size={34} />
+                            )}
                           </div>
                         )}
                       </div>
-                      <div className="p-4">
+                      <div className="relative p-4">
                         <div className="font-semibold text-[var(--ink-950)]">{asset.title}</div>
                         <div className="mt-1 text-sm text-[var(--ink-700)]">{asset.subtitle}</div>
-                        <div className="mt-3 text-sm leading-7 text-[var(--ink-800)]">{asset.note}</div>
-                        <div className="mt-4 text-xs text-[var(--ink-500)]">{formatDateTime(asset.addedAt)}</div>
+                        <div className="mt-3 text-sm leading-7 text-[var(--ink-800)]">
+                          {asset.note}
+                        </div>
+                        <div className="mt-4 text-xs text-[var(--ink-500)]">
+                          {formatDateTime(asset.addedAt)}
+                        </div>
                       </div>
                     </div>
                   </motion.div>
                 ))}
               </div>
             ) : (
-              <div className="mt-6 rounded-[28px] border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] p-8 text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[rgba(78,149,188,0.12)] text-[var(--brand-700)]">
+              <div className="surface-dashed mt-6 rounded-[28px] p-8 text-center">
+                <div className="accent-icon-block mx-auto flex h-14 w-14 items-center justify-center rounded-2xl">
                   <Boxes size={24} />
                 </div>
-                <div className="mt-4 text-lg font-semibold text-[var(--ink-950)]">Материалы ещё не добавлены</div>
+                <div className="mt-4 text-lg font-semibold text-[var(--ink-950)]">
+                  Материалы пока не добавлены
+                </div>
               </div>
             )}
 
-            <StageActions onDemo={() => applyDemoVariant(pageKey)} onNext={moveToNext} onGenerate={moveToGeneration} />
+            <StageActions
+              onDemo={() => applyDemoVariant(pageKey)}
+              onNext={moveToNext}
+              onGenerate={moveToGeneration}
+            />
           </Panel>
         </section>
       ) : null}
 
-      {activeBranch === 'kp' && stageId === 'comments' ? (
+      {activeBranch === 'kp' && safeStageId === 'comments' ? (
         <section>
           <Panel className="rounded-[34px] p-6">
-            <Eyebrow>{getBranchLabel(activeBranch)} / {currentStage.label}</Eyebrow>
-            <label className="block">
+            <Eyebrow>
+              {getBranchLabel(activeBranch)} / {currentStage.label}
+            </Eyebrow>
+            <div className="mt-5">
+              <h3 className="display-section-title text-3xl text-[var(--ink-950)]">
+                Комментарии к контексту
+              </h3>
+            </div>
+            <label className="mt-5 block">
               <textarea
                 value={demoCase.kpContextNotes}
                 onChange={(event) => updateStageNotes('kp', event.target.value)}
                 rows={8}
-                placeholder="Комментарии и вводные..."
-                className="w-full rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-4 text-sm leading-7 text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
+                placeholder="Дополнительные замечания и комментарии..."
+                className={`w-full rounded-[24px] ${fieldStyles}`}
               />
             </label>
-            <StageActions onDemo={() => applyDemoVariant(pageKey)} onNext={moveToNext} onGenerate={moveToGeneration} />
+            <StageActions
+              onDemo={() => applyDemoVariant(pageKey)}
+              onNext={moveToNext}
+              onGenerate={moveToGeneration}
+            />
           </Panel>
         </section>
       ) : null}
 
-      {activeBranch === 'tz' && stageId === 'source' ? (
+      {activeBranch === 'tz' && safeStageId === 'source' ? (
         <section>
           <Panel className="rounded-[34px] p-6">
-            <Eyebrow>{getBranchLabel(activeBranch)} / {currentStage.label}</Eyebrow>
-            <div className="flex items-start justify-between gap-4">
-              <h3 className="text-2xl font-semibold text-[var(--ink-950)]">Основа из КП</h3>
+            <Eyebrow>
+              {getBranchLabel(activeBranch)} / {currentStage.label}
+            </Eyebrow>
+            <div className="mt-5 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="display-section-title text-3xl text-[var(--ink-950)]">
+                  Основа из КП
+                </h3>
+                <p className="mt-2 text-sm leading-7 text-[var(--ink-800)]">
+                  Выберите исходную основу для технической ветки в более премиальной панели
+                  отбора.
+                </p>
+              </div>
               <DemoVariantButton onClick={() => applyDemoVariant(pageKey)} />
             </div>
 
@@ -263,16 +349,16 @@ export function CasePage() {
                     <button
                       key={item.id}
                       onClick={() => selectSourceKp(item.id)}
-                      className={`rounded-[28px] border p-5 text-left transition ${
-                        isSelected
-                          ? 'border-[var(--brand-500)] bg-[rgba(78,149,188,0.14)]'
-                          : 'border-[var(--border-soft)] bg-[var(--surface-muted)]'
-                      }`}
+                      className={`rounded-[28px] p-5 text-left ${isSelected ? 'executive-card executive-highlight' : 'executive-card'}`}
                     >
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="relative flex items-start justify-between gap-3">
                         <div>
-                          <div className="text-lg font-semibold text-[var(--ink-950)]">{item.title}</div>
-                          <div className="mt-2 text-sm leading-7 text-[var(--ink-700)]">{item.summary}</div>
+                          <div className="text-lg font-semibold text-[var(--ink-950)]">
+                            {item.title}
+                          </div>
+                          <div className="mt-2 text-sm leading-7 text-[var(--ink-700)]">
+                            {item.summary}
+                          </div>
                         </div>
                         <StatusPill tone={item.badgeTone}>{item.statusLabel}</StatusPill>
                       </div>
@@ -281,36 +367,44 @@ export function CasePage() {
                 })}
               </div>
             ) : (
-              <div className="mt-6 rounded-[28px] border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] p-8 text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[rgba(78,149,188,0.12)] text-[var(--brand-700)]">
+              <div className="surface-dashed mt-6 rounded-[28px] p-8 text-center">
+                <div className="accent-icon-block mx-auto flex h-14 w-14 items-center justify-center rounded-2xl">
                   <ScrollText size={24} />
                 </div>
-                <div className="mt-4 text-lg font-semibold text-[var(--ink-950)]">Основа пока не выбрана</div>
+                <div className="mt-4 text-lg font-semibold text-[var(--ink-950)]">
+                  Основа пока не выбрана
+                </div>
               </div>
             )}
 
-            <div className="mt-6 rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-muted)] p-4 text-sm leading-7 text-[var(--ink-800)]">
-              {selectedSource ? `${selectedSource.title}` : 'Можно продолжить и без основы.'}
+            <div className="surface-note mt-6 rounded-[24px] p-4 text-sm leading-7 text-[var(--ink-800)]">
+              {selectedSource ? `${selectedSource.title}` : 'Можно продолжить и без выбранной основы.'}
             </div>
             <Button className="mt-5" variant="ghost" onClick={() => selectSourceKp(null)}>
               Продолжить без основы
             </Button>
-            <StageActions onDemo={() => applyDemoVariant(pageKey)} onNext={moveToNext} onGenerate={moveToGeneration} />
+            <StageActions
+              onDemo={() => applyDemoVariant(pageKey)}
+              onNext={moveToNext}
+              onGenerate={moveToGeneration}
+            />
           </Panel>
         </section>
       ) : null}
 
-      {activeBranch === 'tz' && stageId === 'need' ? (
+      {activeBranch === 'tz' && safeStageId === 'need' ? (
         <section>
           <Panel className="rounded-[34px] p-6">
-            <Eyebrow>{getBranchLabel(activeBranch)} / {currentStage.label}</Eyebrow>
-            <label className="block">
+            <Eyebrow>
+              {getBranchLabel(activeBranch)} / {currentStage.label}
+            </Eyebrow>
+            <label className="mt-5 block">
               <textarea
                 value={demoCase.tzRequestSummary}
                 onChange={(event) => updateRequestSummary('tz', event.target.value)}
                 rows={8}
                 placeholder="Опишите техническую цель и ожидаемый результат..."
-                className="w-full rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-4 text-sm leading-7 text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
+                className={`w-full rounded-[24px] ${fieldStyles}`}
               />
             </label>
 
@@ -324,52 +418,59 @@ export function CasePage() {
                       value={field.value}
                       onChange={(event) => updateField(field.id, event.target.value)}
                       rows={3}
-                      className="mt-3 w-full rounded-[20px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
+                      className={`mt-3 w-full rounded-[20px] ${fieldStyles}`}
                     />
                   ) : (
                     <input
                       value={field.value}
                       onChange={(event) => updateField(field.id, event.target.value)}
-                      className="mt-3 w-full rounded-[20px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
+                      className={`mt-3 w-full rounded-[20px] ${fieldStyles}`}
                     />
                   )}
                 </label>
               ))}
             </div>
 
-            <StageActions onDemo={() => applyDemoVariant(pageKey)} onNext={moveToNext} onGenerate={moveToGeneration} />
+            <StageActions
+              onDemo={() => applyDemoVariant(pageKey)}
+              onNext={moveToNext}
+              onGenerate={moveToGeneration}
+            />
           </Panel>
         </section>
       ) : null}
 
-      {activeBranch === 'tz' && stageId === 'comments' ? (
+      {activeBranch === 'tz' && safeStageId === 'comments' ? (
         <section>
           <Panel className="rounded-[34px] p-6">
             {demoCase.tzMeasurements.length ? (
               <div className="grid gap-4 md:grid-cols-2">
                 {demoCase.tzMeasurements.map((measurement) => (
-                  <label
-                    key={measurement.id}
-                    className="rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-muted)] p-4"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Ruler size={16} className="text-[var(--brand-700)]" />
-                      <div className="text-sm font-semibold text-[var(--ink-950)]">{measurement.label}</div>
-                    </div>
-                    <div className="mt-2 text-xs text-[var(--ink-500)]">{measurement.note}</div>
-                    <div className="mt-3 flex items-center gap-3">
-                      <input
-                        value={measurement.value}
-                        onChange={(event) => updateMeasurement(measurement.id, event.target.value)}
-                        className="w-full rounded-[18px] border border-[var(--border-soft)] bg-[rgba(255,255,255,0.03)] px-4 py-3 text-sm text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
-                      />
-                      <div className="text-sm text-[var(--ink-700)]">{measurement.unit}</div>
+                  <label key={measurement.id} className="executive-card rounded-[24px] p-4">
+                    <div className="relative">
+                      <div className="flex items-center gap-2">
+                        <Ruler size={16} className="text-[var(--brand-700)]" />
+                        <div className="text-sm font-semibold text-[var(--ink-950)]">
+                          {measurement.label}
+                        </div>
+                      </div>
+                      <div className="mt-2 text-xs text-[var(--ink-500)]">{measurement.note}</div>
+                      <div className="mt-3 flex items-center gap-3">
+                        <input
+                          value={measurement.value}
+                          onChange={(event) =>
+                            updateMeasurement(measurement.id, event.target.value)
+                          }
+                          className={`w-full rounded-[18px] ${fieldStyles}`}
+                        />
+                        <div className="text-sm text-[var(--ink-700)]">{measurement.unit}</div>
+                      </div>
                     </div>
                   </label>
                 ))}
               </div>
             ) : (
-              <div className="rounded-[26px] border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] p-6 text-sm leading-7 text-[var(--ink-700)]">
+              <div className="surface-dashed rounded-[26px] p-6 text-sm leading-7 text-[var(--ink-700)]">
                 Замеры пока не добавлены.
               </div>
             )}
@@ -379,12 +480,16 @@ export function CasePage() {
                 value={demoCase.tzTechnicalNotes}
                 onChange={(event) => updateStageNotes('tz', event.target.value)}
                 rows={6}
-                placeholder="Технические вводные..."
-                className="w-full rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-4 text-sm leading-7 text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
+                placeholder="Технические комментарии..."
+                className={`w-full rounded-[24px] ${fieldStyles}`}
               />
             </label>
 
-            <StageActions onDemo={() => applyDemoVariant(pageKey)} onNext={moveToNext} onGenerate={moveToGeneration} />
+            <StageActions
+              onDemo={() => applyDemoVariant(pageKey)}
+              onNext={moveToNext}
+              onGenerate={moveToGeneration}
+            />
           </Panel>
         </section>
       ) : null}

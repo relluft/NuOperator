@@ -36,23 +36,23 @@ function formatQuantity(value: number) {
 
 function resolveRiskClasses(annotation?: DraftCellAnnotation) {
   if (!annotation?.issue) {
-    return 'border-[rgba(122,146,176,0.55)] bg-[rgba(15,26,38,0.92)]'
+    return 'border-[var(--paper-line)] bg-[rgba(13,11,9,0.94)]'
   }
 
   if (annotation.issue.severity === 'high') {
-    return 'border-rose-400/45 bg-[rgba(118,34,34,0.28)]'
+    return 'border-rose-500/32 bg-[rgba(73,25,31,0.4)]'
   }
 
   if (annotation.issue.severity === 'medium') {
-    return 'border-orange-400/45 bg-[rgba(130,71,24,0.26)]'
+    return 'border-amber-500/30 bg-[rgba(82,52,23,0.38)]'
   }
 
-  return 'border-amber-400/45 bg-[rgba(138,109,26,0.22)]'
+  return 'border-amber-400/28 bg-[rgba(93,73,28,0.32)]'
 }
 
 function resolveInfoButtonClasses(annotation?: DraftCellAnnotation) {
   if (!annotation?.issue) {
-    return 'text-[var(--ink-500)] hover:bg-white/8 hover:text-[var(--ink-200)]'
+    return 'text-[var(--ink-500)] hover:bg-white/6 hover:text-[var(--ink-800)]'
   }
 
   if (annotation.issue.severity === 'high') {
@@ -157,13 +157,13 @@ export function KpOfferTableEditor({
     const issueLabel = resolveIssueLabel(annotation)
 
     return (
-      <div className="absolute right-2 bottom-9 z-30 w-64 rounded-2xl border border-[var(--border-strong)] bg-[rgba(9,18,29,0.98)] p-3 shadow-2xl shadow-slate-950/40">
+      <div className="absolute bottom-9 right-2 z-30 w-64 rounded-2xl border border-[var(--border-strong)] bg-[rgba(11,9,8,0.98)] p-3 shadow-2xl shadow-black/60">
         {annotation.sources.map((source) => (
           <div key={`${cellId}-${source.label}`} className="mb-2 last:mb-0">
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-500)]">
               {source.label}
             </div>
-            <div className="mt-1 text-xs leading-5 text-[var(--ink-200)]">{source.excerpt}</div>
+            <div className="mt-1 text-xs leading-5 text-[var(--ink-900)]">{source.excerpt}</div>
           </div>
         ))}
 
@@ -172,8 +172,12 @@ export function KpOfferTableEditor({
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-500)]">
               {issueLabel}
             </div>
-            <div className="mt-1 text-xs font-semibold text-[var(--ink-100)]">{annotation.issue.title}</div>
-            <div className="mt-1 text-xs leading-5 text-[var(--ink-300)]">{annotation.issue.summary}</div>
+            <div className="mt-1 text-xs font-semibold text-[var(--ink-950)]">
+              {annotation.issue.title}
+            </div>
+            <div className="mt-1 text-xs leading-5 text-[var(--ink-800)]">
+              {annotation.issue.summary}
+            </div>
           </div>
         ) : null}
       </div>
@@ -194,7 +198,7 @@ export function KpOfferTableEditor({
             setOpenPopoverId((current) => (current === cellId ? null : cellId))
           }}
           className={cn(
-            'absolute right-1.5 bottom-1.5 rounded-full p-1 opacity-75 transition',
+            'absolute bottom-1.5 right-1.5 rounded-full p-1 opacity-75 transition',
             resolveInfoButtonClasses(annotation),
           )}
           aria-label="Показать обоснование"
@@ -260,7 +264,7 @@ export function KpOfferTableEditor({
                   commitEditing(onCommit)
                 }
               }}
-              className="min-h-[88px] w-full resize-none rounded-xl border border-[var(--brand-500)] bg-[rgba(11,20,30,0.96)] px-3 py-2 text-sm leading-6 text-[var(--ink-100)] outline-none"
+              className="min-h-[88px] w-full resize-none rounded-xl border border-[rgba(214,173,107,0.34)] bg-[rgba(11,9,8,0.98)] px-3 py-2 text-sm leading-6 text-[var(--ink-950)] outline-none"
             />
           ) : (
             <input
@@ -280,7 +284,7 @@ export function KpOfferTableEditor({
                 }
               }}
               className={cn(
-                'w-full rounded-xl border border-[var(--brand-500)] bg-[rgba(11,20,30,0.96)] px-3 py-2 text-sm text-[var(--ink-100)] outline-none',
+                'w-full rounded-xl border border-[rgba(214,173,107,0.34)] bg-[rgba(11,9,8,0.98)] px-3 py-2 text-sm text-[var(--ink-950)] outline-none',
                 isRightAligned ? 'text-right tabular-nums' : 'text-left',
               )}
             />
@@ -288,7 +292,7 @@ export function KpOfferTableEditor({
         ) : (
           <div
             className={cn(
-              'min-h-[24px] whitespace-pre-wrap pr-6 text-sm leading-6 text-[var(--ink-100)]',
+              'min-h-[24px] whitespace-pre-wrap pr-6 text-sm leading-6 text-[var(--ink-950)]',
               !displayValue && 'text-[var(--ink-500)]',
             )}
           >
@@ -302,15 +306,15 @@ export function KpOfferTableEditor({
   }
 
   return (
-    <div className="document-paper rounded-[32px] border border-[var(--border-soft)] p-3 md:p-4">
-      <div className="overflow-x-auto">
+    <div className="document-paper rounded-[34px] border border-[var(--border-soft)] p-3 md:p-4">
+      <div className="overflow-x-auto rounded-[28px] border border-[var(--paper-line)] bg-[rgba(10,8,7,0.82)]">
         <table className="min-w-[1180px] w-full border-collapse text-left text-sm text-[var(--ink-900)]">
           <thead>
-            <tr className="bg-[rgba(10,20,32,0.92)] text-[var(--ink-500)]">
+            <tr className="bg-[linear-gradient(180deg,rgba(255,248,234,0.05),transparent_22%),rgba(13,11,9,0.98)] text-[var(--ink-500)]">
               {kpOfferColumns.map((column) => (
                 <th
                   key={column}
-                  className="border border-[rgba(122,146,176,0.55)] px-3 py-3 align-top text-[12px] font-semibold leading-5"
+                  className="border border-[var(--paper-line)] px-3 py-3 align-top text-[12px] font-semibold leading-5"
                 >
                   {column}
                 </th>
@@ -325,12 +329,15 @@ export function KpOfferTableEditor({
                 const installationTotal = item.quantity * item.installationUnitPrice
                 const grandTotal = productTotal + installationTotal
                 const productTotalCellId = resolveComputedCellId(item.id, 'productTotal')
-                const installationTotalCellId = resolveComputedCellId(item.id, 'installationTotal')
+                const installationTotalCellId = resolveComputedCellId(
+                  item.id,
+                  'installationTotal',
+                )
                 const grandTotalCellId = resolveComputedCellId(item.id, 'grandTotal')
 
                 return (
                   <tr key={item.id} className="align-top">
-                    <td className="border border-[rgba(122,146,176,0.55)] bg-[rgba(15,26,38,0.92)] px-3 py-4 text-center font-semibold">
+                    <td className="border border-[var(--paper-line)] bg-[rgba(13,11,9,0.94)] px-3 py-4 text-center font-semibold text-[var(--ink-950)]">
                       {index + 1}
                     </td>
 
@@ -339,7 +346,8 @@ export function KpOfferTableEditor({
                       value: item.description,
                       displayValue: item.description,
                       multiline: true,
-                      annotation: cellAnnotations[resolveEditableFieldCellId(item.id, 'description')],
+                      annotation:
+                        cellAnnotations[resolveEditableFieldCellId(item.id, 'description')],
                       onCommit: (value) => onUpdateOfferItem?.(item.id, 'description', value),
                     })}
 
@@ -366,13 +374,17 @@ export function KpOfferTableEditor({
                       value: String(item.installationUnitPrice),
                       displayValue: formatAmount(item.installationUnitPrice),
                       align: 'right',
-                      annotation: cellAnnotations[resolveEditableFieldCellId(item.id, 'installationUnitPrice')],
-                      onCommit: (value) => onUpdateOfferItem?.(item.id, 'installationUnitPrice', value),
+                      annotation:
+                        cellAnnotations[
+                          resolveEditableFieldCellId(item.id, 'installationUnitPrice')
+                        ],
+                      onCommit: (value) =>
+                        onUpdateOfferItem?.(item.id, 'installationUnitPrice', value),
                     })}
 
                     <td
                       className={cn(
-                        'relative border px-3 py-4 text-right tabular-nums',
+                        'relative border px-3 py-4 text-right tabular-nums text-[var(--ink-950)]',
                         resolveRiskClasses(cellAnnotations[productTotalCellId]),
                       )}
                     >
@@ -382,17 +394,20 @@ export function KpOfferTableEditor({
 
                     <td
                       className={cn(
-                        'relative border px-3 py-4 text-right tabular-nums',
+                        'relative border px-3 py-4 text-right tabular-nums text-[var(--ink-950)]',
                         resolveRiskClasses(cellAnnotations[installationTotalCellId]),
                       )}
                     >
                       {formatAmount(installationTotal)}
-                      {renderMetaButton(installationTotalCellId, cellAnnotations[installationTotalCellId])}
+                      {renderMetaButton(
+                        installationTotalCellId,
+                        cellAnnotations[installationTotalCellId],
+                      )}
                     </td>
 
                     <td
                       className={cn(
-                        'relative border px-3 py-4 text-right font-semibold tabular-nums',
+                        'relative border px-3 py-4 text-right font-semibold tabular-nums text-[var(--ink-950)]',
                         resolveRiskClasses(cellAnnotations[grandTotalCellId]),
                       )}
                     >
@@ -406,9 +421,10 @@ export function KpOfferTableEditor({
               <tr>
                 <td
                   colSpan={8}
-                  className="border border-[rgba(122,146,176,0.55)] bg-[rgba(15,26,38,0.92)] px-5 py-6 text-sm leading-7 text-[var(--ink-500)]"
+                  className="border border-[var(--paper-line)] bg-[rgba(13,11,9,0.94)] px-5 py-6 text-sm leading-7 text-[var(--ink-500)]"
                 >
-                  Таблица готова к редактированию. Демо-заполнение можно включить кнопкой справа сверху.
+                  Таблица готова к редактированию. Демо-заполнение можно включить кнопкой справа
+                  сверху.
                 </td>
               </tr>
             )}
@@ -422,27 +438,29 @@ export function KpOfferTableEditor({
                   key={total.id}
                   className={
                     total.tone === 'final'
-                      ? 'bg-[rgba(28,44,62,0.98)]'
+                      ? 'bg-[rgba(41,29,18,0.98)]'
                       : total.tone === 'subtotal'
-                        ? 'bg-[rgba(22,34,48,0.96)]'
-                        : 'bg-[rgba(18,30,44,0.88)]'
+                        ? 'bg-[rgba(22,17,13,0.96)]'
+                        : 'bg-[rgba(17,14,11,0.9)]'
                   }
                 >
                   <td
                     colSpan={5}
-                    className="border border-[rgba(122,146,176,0.55)] px-3 py-3 text-right text-[12px] font-semibold uppercase tracking-[0.08em]"
+                    className="border border-[var(--paper-line)] px-3 py-3 text-right text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-800)]"
                   >
                     {total.label}
                   </td>
-                  <td className="border border-[rgba(122,146,176,0.55)] px-3 py-3 text-right font-semibold tabular-nums">
+                  <td className="border border-[var(--paper-line)] px-3 py-3 text-right font-semibold tabular-nums text-[var(--ink-950)]">
                     {total.productTotal === undefined ? '' : formatAmount(total.productTotal)}
                   </td>
-                  <td className="border border-[rgba(122,146,176,0.55)] px-3 py-3 text-right font-semibold tabular-nums">
-                    {total.installationTotal === undefined ? '' : formatAmount(total.installationTotal)}
+                  <td className="border border-[var(--paper-line)] px-3 py-3 text-right font-semibold tabular-nums text-[var(--ink-950)]">
+                    {total.installationTotal === undefined
+                      ? ''
+                      : formatAmount(total.installationTotal)}
                   </td>
                   <td
                     className={cn(
-                      'relative border px-3 py-3 text-right font-semibold tabular-nums',
+                      'relative border px-3 py-3 text-right font-semibold tabular-nums text-[var(--ink-950)]',
                       resolveRiskClasses(annotation),
                     )}
                   >
@@ -460,7 +478,7 @@ export function KpOfferTableEditor({
                 <tr key={field.id}>
                   <td
                     colSpan={2}
-                    className="border border-[rgba(122,146,176,0.55)] bg-[rgba(12,23,35,0.96)] px-3 py-3 text-sm font-semibold text-[var(--ink-200)]"
+                    className="border border-[var(--paper-line)] bg-[rgba(15,12,10,0.96)] px-3 py-3 text-sm font-semibold text-[var(--ink-900)]"
                   >
                     <div className="flex items-center gap-2">
                       <PencilLine size={15} className="text-[var(--brand-700)]" />

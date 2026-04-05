@@ -8,7 +8,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router-dom'
-import { Button, Eyebrow, Panel, ProgressBar, StatusPill } from '../components/ui'
+import { Button, Eyebrow, Panel, ProgressBar, StatusPill, fieldStyles } from '../components/ui'
 import { useDemo } from '../context/DemoContext'
 import { draftPath } from '../lib/routes'
 import { getBranchLabel } from '../lib/workflow'
@@ -27,19 +27,19 @@ const exportCards: Array<{
   {
     format: 'DOCX',
     title: 'Word',
-    caption: 'Редактируемый шаблон для финальной доработки и печати.',
+    caption: 'Редактируемый файл для финальной полировки и печати.',
     icon: FileText,
   },
   {
     format: 'PDF',
     title: 'PDF',
-    caption: 'Готовый файл для отправки, согласования и визуального контроля.',
+    caption: 'Готовый для презентации файл для отправки, согласования и показа.',
     icon: FileType2,
   },
   {
     format: 'XLSX',
     title: 'Excel',
-    caption: 'Табличная выгрузка для расчётов, сметной части и приложений.',
+    caption: 'Структурированная выгрузка для расчётов, смет и коммерческих приложений.',
     icon: FileSpreadsheet,
   },
 ]
@@ -54,13 +54,7 @@ function getFormatLabel(format: ExportFormat | null) {
 export function ExportPage() {
   const { branch, exportId } = useParams()
   const {
-    state: {
-      cases,
-      exportForm,
-      exportGeneration,
-      branchLaunch,
-      demoAppliedByPage,
-    },
+    state: { cases, exportForm, exportGeneration, branchLaunch, demoAppliedByPage },
     applyDemoVariant,
     updateExportField,
     startExportGeneration,
@@ -71,31 +65,38 @@ export function ExportPage() {
     markStageComplete,
   } = useDemo()
 
-  if (branch !== 'kp' && branch !== 'tz') {
-    return <Navigate to="/workspace" replace />
-  }
-
-  const activeBranch = branch as DemoDocumentType
-  const demoCase = cases.find((demoCase) => demoCase.exportId === exportId) ?? cases[0]
+  const isValidBranch = branch === 'kp' || branch === 'tz'
+  const activeBranch = (isValidBranch ? branch : 'kp') as DemoDocumentType
+  const demoCase = isValidBranch
+    ? cases.find((demoCase) => demoCase.exportId === exportId) ?? cases[0]
+    : null
   const pageKey = resolveExportPageKey(activeBranch)
   const hasDemoVariant = !!demoAppliedByPage[pageKey]
   const pipelineName = branchLaunch[activeBranch].pipelineName
 
   useEffect(() => {
+    if (!isValidBranch) {
+      return
+    }
+
     setBranchStage(activeBranch, 'export')
     markStageComplete(activeBranch, 'editor')
-  }, [activeBranch, markStageComplete, setBranchStage])
+  }, [activeBranch, isValidBranch, markStageComplete, setBranchStage])
 
   useEffect(() => {
-    if (exportGeneration.status !== 'ready') {
+    if (!isValidBranch || exportGeneration.status !== 'ready') {
       return
     }
 
     markStageComplete(activeBranch, 'export')
-  }, [activeBranch, exportGeneration.status, markStageComplete])
+  }, [activeBranch, exportGeneration.status, isValidBranch, markStageComplete])
 
   useEffect(() => {
-    if (exportGeneration.status !== 'generating' || !exportGeneration.selectedFormat) {
+    if (
+      !isValidBranch ||
+      exportGeneration.status !== 'generating' ||
+      !exportGeneration.selectedFormat
+    ) {
       return
     }
 
@@ -120,8 +121,13 @@ export function ExportPage() {
     completeExportGeneration,
     exportGeneration.selectedFormat,
     exportGeneration.status,
+    isValidBranch,
     setExportProgress,
   ])
+
+  if (!isValidBranch) {
+    return <Navigate to="/workspace" replace />
+  }
 
   if (!demoCase || exportId !== demoCase.exportId) {
     return null
@@ -129,63 +135,82 @@ export function ExportPage() {
 
   return (
     <div className="space-y-6">
-      <Panel className="rounded-[34px] p-6 md:p-8">
+      <Panel tone="gold" className="rounded-[34px] p-6 md:p-8">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr),360px]">
           <div className="space-y-4">
             <Eyebrow>{getBranchLabel(activeBranch)} / Экспорт</Eyebrow>
             <div className="max-w-3xl">
-              <h1 className="text-3xl font-semibold text-[var(--ink-950)] md:text-[2.4rem]">
+              <h1 className="display-title text-5xl text-[var(--ink-950)] md:text-[4rem]">
                 Финальный выпуск документа
               </h1>
-              <p className="mt-3 text-sm leading-7 text-[var(--ink-700)] md:text-base">
-                Здесь сотрудник вручную добавляет реквизиты, адреса и дату перед выпуском документа по шаблону
-                компании. После выбора формата запускается демонстрационная генерация финального файла.
+              <p className="mt-4 text-sm leading-8 text-[var(--ink-800)] md:text-base">
+                Этот экран завершает сценарий: ручные реквизиты, выбор формата и аккуратная
+                генерация финального артефакта.
               </p>
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
-              <div className="rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-muted)] p-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--ink-500)]">Пайплайн</div>
-                <div className="mt-2 text-lg font-semibold text-[var(--ink-950)]">
-                  {pipelineName || 'Демо-пайплайн'}
+              <div className="executive-card rounded-[24px] p-4">
+                <div className="relative">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--ink-500)]">
+                    Пайплайн
+                  </div>
+                  <div className="mt-2 text-lg font-semibold text-[var(--ink-950)]">
+                    {pipelineName || 'Демо-пайплайн'}
+                  </div>
                 </div>
               </div>
-              <div className="rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-muted)] p-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--ink-500)]">Дата документа</div>
-                <div className="mt-2 text-lg font-semibold text-[var(--ink-950)]">
-                  {exportForm.documentDate || 'Заполните вручную'}
+              <div className="executive-card rounded-[24px] p-4">
+                <div className="relative">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--ink-500)]">
+                    Дата документа
+                  </div>
+                  <div className="mt-2 text-lg font-semibold text-[var(--ink-950)]">
+                    {exportForm.documentDate || 'Заполните вручную'}
+                  </div>
                 </div>
               </div>
-              <div className="rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-muted)] p-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--ink-500)]">Статус</div>
-                <div className="mt-2 text-lg font-semibold text-[var(--ink-950)]">
-                  {exportGeneration.status === 'idle'
-                    ? 'Готово к запуску'
-                    : exportGeneration.status === 'generating'
-                      ? 'Генерация документа'
-                      : `Подготовлен ${getFormatLabel(exportGeneration.selectedFormat)}`}
+              <div className="executive-card gold-highlight rounded-[24px] p-4">
+                <div className="relative">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--ink-500)]">
+                    Статус
+                  </div>
+                  <div className="mt-2 text-lg font-semibold text-[var(--ink-950)]">
+                    {exportGeneration.status === 'idle'
+                      ? 'Готово к генерации'
+                      : exportGeneration.status === 'generating'
+                        ? 'Идёт подготовка файла'
+                        : `Подготовлен ${getFormatLabel(exportGeneration.selectedFormat)}`}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="rounded-[30px] border border-[var(--border-soft)] bg-[var(--surface-strong)] p-5">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-[rgba(78,149,188,0.12)] p-3 text-[var(--brand-700)]">
-                <Sparkles size={20} />
-              </div>
-              <div>
-                <div className="font-semibold text-[var(--ink-950)]">Демо финального шага</div>
-                <div className="text-sm text-[var(--ink-700)]">
-                  Подставит пример реквизитов для презентации экрана экспорта.
+          <div className="executive-card gold-highlight rounded-[30px] p-5">
+            <div className="relative">
+              <div className="flex items-center gap-3">
+                <div className="accent-icon-block rounded-2xl p-3 text-[var(--accent-amber-strong)]">
+                  <Sparkles size={20} />
+                </div>
+                <div>
+                  <div className="font-semibold text-[var(--ink-950)]">Демо-шаг выпуска</div>
+                  <div className="text-sm text-[var(--ink-700)]">
+                    Заполняет презентационные реквизиты, чтобы экспорт выглядел завершённым на
+                    живой встрече.
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <Button className="mt-5 w-full justify-center" variant="secondary" onClick={() => applyDemoVariant(pageKey)}>
-              <Sparkles size={16} />
-              {hasDemoVariant ? 'Обновить демо-данные' : 'Демонстрационный вариант'}
-            </Button>
+              <Button
+                className="mt-5 w-full justify-center"
+                variant="secondary"
+                onClick={() => applyDemoVariant(pageKey)}
+              >
+                <Sparkles size={16} />
+                {hasDemoVariant ? 'Обновить демо-данные' : 'Применить демо-вариант'}
+              </Button>
+            </div>
           </div>
         </div>
       </Panel>
@@ -196,10 +221,10 @@ export function ExportPage() {
             <div>
               <div className="text-xl font-semibold text-[var(--ink-950)]">Ручные реквизиты</div>
               <div className="mt-1 text-sm text-[var(--ink-700)]">
-                Эти поля человек заполняет вручную перед финальным экспортом.
+                Эти поля остаются под контролем человека перед финальным экспортом.
               </div>
             </div>
-            <StatusPill tone="attention">Manual input</StatusPill>
+            <StatusPill tone="attention">Ручной ввод</StatusPill>
           </div>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -208,8 +233,8 @@ export function ExportPage() {
               <input
                 value={exportForm.counterpartyName}
                 onChange={(event) => updateExportField('counterpartyName', event.target.value)}
-                placeholder="ООО Ромашка"
-                className="mt-3 w-full rounded-[22px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-3.5 text-sm text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
+                placeholder="ООО Пример"
+                className={`mt-3 w-full rounded-[22px] ${fieldStyles}`}
               />
             </label>
 
@@ -219,7 +244,7 @@ export function ExportPage() {
                 type="date"
                 value={exportForm.documentDate}
                 onChange={(event) => updateExportField('documentDate', event.target.value)}
-                className="mt-3 w-full rounded-[22px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-3.5 text-sm text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
+                className={`mt-3 w-full rounded-[22px] ${fieldStyles}`}
               />
             </label>
 
@@ -229,7 +254,7 @@ export function ExportPage() {
                 value={exportForm.counterpartyAddress}
                 onChange={(event) => updateExportField('counterpartyAddress', event.target.value)}
                 placeholder="Юридический или почтовый адрес"
-                className="mt-3 w-full rounded-[22px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-3.5 text-sm text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
+                className={`mt-3 w-full rounded-[22px] ${fieldStyles}`}
               />
             </label>
 
@@ -239,7 +264,7 @@ export function ExportPage() {
                 value={exportForm.objectAddress}
                 onChange={(event) => updateExportField('objectAddress', event.target.value)}
                 placeholder="Где выполняются работы"
-                className="mt-3 w-full rounded-[22px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-3.5 text-sm text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
+                className={`mt-3 w-full rounded-[22px] ${fieldStyles}`}
               />
             </label>
 
@@ -248,8 +273,8 @@ export function ExportPage() {
               <input
                 value={exportForm.signatoryName}
                 onChange={(event) => updateExportField('signatoryName', event.target.value)}
-                placeholder="ФИО ответственного"
-                className="mt-3 w-full rounded-[22px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-3.5 text-sm text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
+                placeholder="ФИО"
+                className={`mt-3 w-full rounded-[22px] ${fieldStyles}`}
               />
             </label>
 
@@ -258,8 +283,8 @@ export function ExportPage() {
               <input
                 value={exportForm.manualNotes}
                 onChange={(event) => updateExportField('manualNotes', event.target.value)}
-                placeholder="Короткое примечание к выпуску"
-                className="mt-3 w-full rounded-[22px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-3.5 text-sm text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
+                placeholder="Короткая служебная пометка"
+                className={`mt-3 w-full rounded-[22px] ${fieldStyles}`}
               />
             </label>
           </div>
@@ -267,9 +292,9 @@ export function ExportPage() {
 
         <div className="space-y-6">
           <Panel className="rounded-[32px] p-6">
-            <div className="text-xl font-semibold text-[var(--ink-950)]">Выберите формат выгрузки</div>
+            <div className="text-xl font-semibold text-[var(--ink-950)]">Выберите формат экспорта</div>
             <div className="mt-2 text-sm leading-7 text-[var(--ink-700)]">
-              Нажмите на нужный формат, и система запустит демонстрационную генерацию документа по шаблону.
+              Выберите тип файла, и система запустит демонстрационный сценарий генерации.
             </div>
 
             <div className="mt-6 space-y-3">
@@ -281,20 +306,22 @@ export function ExportPage() {
                   <button
                     key={card.format}
                     onClick={() => startExportGeneration(card.format)}
-                    className={`w-full rounded-[26px] border px-4 py-4 text-left transition ${
-                      isActive
-                        ? 'border-[var(--brand-500)] bg-[rgba(78,149,188,0.16)] shadow-lg shadow-cyan-950/10'
-                        : 'border-[var(--border-soft)] bg-[var(--surface-muted)] hover:border-[var(--border-strong)]'
+                    className={`w-full rounded-[26px] px-4 py-4 text-left ${
+                      isActive ? 'executive-card executive-highlight' : 'executive-card'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-4">
+                    <div className="relative flex items-start justify-between gap-4">
                       <div className="flex items-start gap-3">
-                        <div className="rounded-2xl bg-[rgba(255,255,255,0.04)] p-3 text-[var(--brand-700)]">
+                        <div className="accent-icon-block-soft rounded-2xl p-3">
                           <Icon size={20} />
                         </div>
                         <div>
-                          <div className="text-base font-semibold text-[var(--ink-950)]">{card.title}</div>
-                          <div className="mt-1 text-sm leading-6 text-[var(--ink-700)]">{card.caption}</div>
+                          <div className="text-base font-semibold text-[var(--ink-950)]">
+                            {card.title}
+                          </div>
+                          <div className="mt-1 text-sm leading-6 text-[var(--ink-700)]">
+                            {card.caption}
+                          </div>
                         </div>
                       </div>
                       <StatusPill tone={isActive ? 'progress' : 'ready'}>{card.format}</StatusPill>
@@ -305,13 +332,17 @@ export function ExportPage() {
             </div>
           </Panel>
 
-          <Panel className="rounded-[32px] p-6">
+          <Panel tone="gold" className="rounded-[32px] p-6">
             <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-[rgba(208,154,58,0.14)] p-3 text-[var(--surface-dark)]">
-                {exportGeneration.status === 'generating' ? <LoaderCircle size={20} className="animate-spin" /> : <Download size={20} />}
+              <div className="accent-icon-block rounded-2xl p-3 text-[var(--accent-amber-strong)]">
+                {exportGeneration.status === 'generating' ? (
+                  <LoaderCircle size={20} className="animate-spin" />
+                ) : (
+                  <Download size={20} />
+                )}
               </div>
               <div>
-                <div className="text-xl font-semibold text-[var(--ink-950)]">Генерация документа</div>
+                <div className="text-xl font-semibold text-[var(--ink-950)]">Статус генерации</div>
                 <div className="text-sm text-[var(--ink-700)]">
                   {exportGeneration.selectedFormat
                     ? `Формат: ${getFormatLabel(exportGeneration.selectedFormat)}`
@@ -321,16 +352,17 @@ export function ExportPage() {
             </div>
 
             {exportGeneration.status === 'idle' ? (
-              <div className="mt-6 rounded-[24px] border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] p-5 text-sm leading-7 text-[var(--ink-700)]">
-                Пока генерация не запущена. После выбора Word, PDF или Excel здесь появится прогресс с процентами и кнопка скачивания.
+              <div className="surface-dashed mt-6 rounded-[24px] p-5 text-sm leading-7 text-[var(--ink-700)]">
+                Генерация ещё не запускалась. После выбора формата здесь появится экран
+                прогресса и выдачи результата.
               </div>
             ) : (
               <div className="mt-6 space-y-5">
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-sm font-medium text-[var(--ink-950)]">
                     {exportGeneration.status === 'generating'
-                      ? 'Нейросеть заполняет шаблон и собирает финальный файл'
-                      : 'Файл успешно подготовлен для демонстрационного скачивания'}
+                      ? 'Система заполняет фирменный шаблон и готовит финальный файл.'
+                      : 'Файл готов для демонстрационной загрузки.'}
                   </div>
                   <div className="text-sm font-semibold text-[var(--brand-700)]">
                     {exportGeneration.progressPercent}%
@@ -345,10 +377,10 @@ export function ExportPage() {
                       style={{ width: `${exportGeneration.progressPercent}%` }}
                     >
                       <div
-                        className="h-full animate-[pulse_1.1s_ease-in-out_infinite] opacity-70"
+                        className="h-full animate-[slow-pulse_1.6s_ease-in-out_infinite] opacity-80"
                         style={{
                           backgroundImage:
-                            'linear-gradient(135deg, rgba(255,255,255,0.08) 25%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.08) 75%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 100%)',
+                            'linear-gradient(135deg, rgba(255,255,255,0.08) 25%, rgba(255,255,255,0.28) 25%, rgba(255,255,255,0.28) 50%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.08) 75%, rgba(255,255,255,0.28) 75%, rgba(255,255,255,0.28) 100%)',
                           backgroundSize: '20px 20px',
                         }}
                       />
@@ -356,27 +388,31 @@ export function ExportPage() {
                   ) : null}
                 </div>
 
-                {exportGeneration.status === 'ready' && exportGeneration.generatedArtifact ? (
-                  <div className="space-y-4 rounded-[26px] border border-emerald-500/30 bg-emerald-500/12 p-5">
+                {exportGeneration.status === 'ready' &&
+                exportGeneration.generatedArtifact ? (
+                  <div className="space-y-4 rounded-[26px] border border-emerald-500/24 bg-[linear-gradient(180deg,rgba(36,96,73,0.28),rgba(20,48,37,0.18))] p-5">
                     <div>
                       <div className="text-base font-semibold text-[var(--ink-950)]">
-                        {getFormatLabel(exportGeneration.generatedArtifact.format)}-документ готов
+                        Документ {getFormatLabel(exportGeneration.generatedArtifact.format)} готов
                       </div>
                       <div className="mt-1 text-sm leading-6 text-[var(--ink-700)]">
-                        Файл собран по демо-шаблону и ожидает скачивания в интерфейсе.
+                        Файл сформирован из демонстрационного шаблона и ждёт скачивания в интерфейсе.
                       </div>
                       <div className="mt-3 text-xs uppercase tracking-[0.16em] text-[var(--ink-500)]">
                         {exportGeneration.generatedArtifact.fileName}
                       </div>
                     </div>
 
-                    <Button className="w-full justify-center py-3 text-base" onClick={showDownloadMessage}>
+                    <Button
+                      className="w-full justify-center py-3 text-base"
+                      onClick={showDownloadMessage}
+                    >
                       <Download size={18} />
                       Скачать документ
                     </Button>
 
                     {exportGeneration.downloadMessage ? (
-                      <div className="rounded-[20px] border border-[var(--border-soft)] bg-[rgba(18,30,44,0.54)] px-4 py-3 text-sm text-[var(--ink-950)]">
+                      <div className="surface-note rounded-[20px] px-4 py-3 text-sm text-[var(--ink-950)]">
                         {exportGeneration.downloadMessage}
                       </div>
                     ) : null}
@@ -388,9 +424,9 @@ export function ExportPage() {
 
           <Link
             to={draftPath(activeBranch, demoCase.draftId)}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-3 text-sm font-semibold text-[var(--ink-950)]"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--border-soft)] bg-[rgba(255,248,234,0.02)] px-4 py-3 text-sm font-semibold text-[var(--ink-950)] transition hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)]"
           >
-            Вернуться в редактор
+            Назад в редактор
           </Link>
         </div>
       </section>

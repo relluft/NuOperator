@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   DraftCellAnnotation,
   DraftCellId,
   DemoAsset,
@@ -158,13 +158,13 @@ const demoFieldDefaults = {
 const defaultOfferServiceTotals: DemoOfferTableTotal[] = [
   {
     id: 'offer-transport',
-    label: 'РўР РђРќРЎРџРћР РўРќР«Р• Р РђРЎРҐРћР”Р«',
+    label: 'ТРАНСПОРТНЫЕ РАСХОДЫ',
     grandTotal: 83605.29,
     tone: 'service',
   },
   {
     id: 'offer-setup',
-    label: 'РћР Р“РђРќРР—РђР¦РРЇ Р РђР‘РћРў РќРђ РћР‘РЄР•РљРўР•',
+    label: 'ОРГАНИЗАЦИЯ РАБОТ НА ОБЪЕКТЕ',
     grandTotal: 12480,
     tone: 'service',
   },
@@ -200,7 +200,7 @@ function buildOfferTotals(
   return [
     {
       id: 'offer-subtotal',
-      label: 'РРўРћР“Рћ',
+      label: 'ИТОГО',
       productTotal: subtotal.productTotal,
       installationTotal: subtotal.installationTotal,
       grandTotal: subtotal.grandTotal,
@@ -209,7 +209,7 @@ function buildOfferTotals(
     ...serviceTotals.map((total) => ({ ...total })),
     {
       id: 'offer-final',
-      label: 'РРўРћР“Рћ, Р’РљР›Р®Р§РђРЇ Р”РћРЎРўРђР’РљРЈ Р РњРћРќРўРђР–',
+      label: 'ИТОГО, ВКЛЮЧАЯ ДОСТАВКУ И МОНТАЖ',
       grandTotal: subtotal.grandTotal + serviceGrandTotal,
       tone: 'final',
     },
@@ -562,7 +562,8 @@ export function getDefaultSectionId(branch: DemoDocumentType) {
   return branch === 'kp' ? 'kp-overview' : 'tz-overview'
 }
 
-export function getDemoNeedText(branch: DemoDocumentType, _pipelineName: string) {
+export function getDemoNeedText(branch: DemoDocumentType, pipelineName: string) {
+  void pipelineName
   if (branch === 'kp') {
     return `Нужно привести входную группу в рабочее и понятное состояние для маломобильных посетителей. Сейчас на входе слишком крутой подъём, неудобный подход к двери, старое металлическое ограждение и скользкое покрытие перед входом. Заказчик хочет решить вопрос без полной перестройки крыльца, но так, чтобы объект выглядел аккуратно и им можно было пользоваться в обычном режиме.
 

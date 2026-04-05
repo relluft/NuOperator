@@ -1,7 +1,7 @@
 import { AlertCircle, ArrowRight, Link2, PencilLine, Sparkles } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { DocumentPreview } from '../components/DocumentPreview'
-import { Button, Eyebrow, Panel, StatusPill } from '../components/ui'
+import { Button, Eyebrow, Panel, StatusPill, buttonStyles, fieldStyles } from '../components/ui'
 import { useDemo } from '../context/DemoContext'
 import { exportPath } from '../lib/routes'
 import { getBranchLabel } from '../lib/workflow'
@@ -60,7 +60,7 @@ export function DraftPage() {
           <div className="flex flex-wrap items-center justify-end gap-3">
             <Link
               to={exportPath(activeBranch, demoCase.exportId)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--brand-600)] px-4 py-2.5 text-sm font-semibold text-slate-950"
+              className={`${buttonStyles('primary')} px-4 py-2.5 text-sm`}
             >
               Перейти к экспорту
               <ArrowRight size={16} />
@@ -85,21 +85,34 @@ export function DraftPage() {
 
   return (
     <div className="space-y-6">
-      <Panel className="rounded-[34px] p-6 md:p-8">
+      <Panel tone="highlight" className="rounded-[34px] p-6 md:p-8">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr),320px]">
           <div>
             <Eyebrow>{getBranchLabel(activeBranch)} / Редактор</Eyebrow>
+            <h1 className="display-title mt-5 text-5xl text-[var(--ink-950)] md:text-6xl">
+              Рабочий черновик
+            </h1>
+            <p className="mt-4 max-w-3xl text-sm leading-8 text-[var(--ink-800)] md:text-base">
+              Пространство для просмотра структуры, замечаний проверки качества и валидации по
+              источникам.
+            </p>
           </div>
 
-          <div className="rounded-[30px] border border-[var(--border-soft)] bg-[var(--surface-strong)] p-5">
-            <div className="text-sm text-[var(--ink-700)]">Состояние редактора</div>
-            <div className="mt-2 text-2xl font-semibold text-[var(--ink-950)]">
-              {hasDemoVariant ? 'Демонстрационный черновик' : 'Пустая рабочая оболочка'}
+          <div className="executive-card executive-highlight rounded-[30px] p-5">
+            <div className="relative">
+              <div className="text-sm text-[var(--ink-700)]">Состояние редактора</div>
+              <div className="mt-2 text-2xl font-semibold text-[var(--ink-950)]">
+                {hasDemoVariant ? 'Демонстрационный черновик' : 'Пустая рабочая оболочка'}
+              </div>
+              <Button
+                className="mt-5 w-full justify-center"
+                variant="secondary"
+                onClick={() => applyDemoVariant(pageKey)}
+              >
+                <Sparkles size={16} />
+                Применить демо-вариант
+              </Button>
             </div>
-            <Button className="mt-5 w-full justify-center" variant="secondary" onClick={() => applyDemoVariant(pageKey)}>
-              <Sparkles size={16} />
-              Демонстрационный вариант
-            </Button>
           </div>
         </div>
       </Panel>
@@ -116,20 +129,24 @@ export function DraftPage() {
                 <button
                   key={section.id}
                   onClick={() => selectSection(section.id)}
-                  className={`w-full rounded-[20px] border px-4 py-3 text-left transition ${
+                  className={`w-full rounded-[20px] px-4 py-3 text-left ${
                     selectedSectionId === section.id
-                      ? 'border-[var(--brand-500)] bg-[var(--surface-strong)] text-[var(--ink-950)] shadow-sm'
-                      : 'border-[var(--border-soft)] bg-[var(--surface-muted)] text-[var(--ink-700)]'
+                      ? 'executive-card executive-highlight'
+                      : 'executive-card'
                   }`}
                 >
-                  <div className="font-semibold">{section.title}</div>
-                  <div className="mt-1 text-sm leading-6">{section.summary}</div>
+                  <div className="relative">
+                    <div className="font-semibold text-[var(--ink-950)]">{section.title}</div>
+                    <div className="mt-1 text-sm leading-6 text-[var(--ink-700)]">
+                      {section.summary}
+                    </div>
+                  </div>
                 </button>
               ))}
             </div>
           ) : (
-            <div className="mt-4 rounded-[22px] border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] p-4 text-sm leading-7 text-[var(--ink-700)]">
-              Пока пусто.
+            <div className="surface-dashed mt-4 rounded-[22px] p-4 text-sm leading-7 text-[var(--ink-700)]">
+              Пусто.
             </div>
           )}
         </Panel>
@@ -157,13 +174,13 @@ export function DraftPage() {
                       value={field.value}
                       onChange={(event) => updateField(field.id, event.target.value)}
                       rows={3}
-                      className="mt-3 w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
+                      className={`mt-3 w-full rounded-2xl ${fieldStyles}`}
                     />
                   ) : (
                     <input
                       value={field.value}
                       onChange={(event) => updateField(field.id, event.target.value)}
-                      className="mt-3 w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
+                      className={`mt-3 w-full rounded-2xl ${fieldStyles}`}
                     />
                   )}
                 </label>
@@ -174,7 +191,7 @@ export function DraftPage() {
           <Panel className="rounded-[32px] p-5">
             <div className="flex items-center gap-2">
               <AlertCircle size={17} className="text-[var(--brand-700)]" />
-              <div className="font-semibold text-[var(--ink-950)]">Замечания QA</div>
+              <div className="font-semibold text-[var(--ink-950)]">Замечания проверки</div>
             </div>
             <div className="mt-4 space-y-3">
               {hasDemoVariant ? (
@@ -184,24 +201,28 @@ export function DraftPage() {
                     <button
                       key={issue.id}
                       onClick={() => focusIssue(issue)}
-                      className={`w-full rounded-[22px] border px-4 py-4 text-left transition ${
+                      className={`w-full rounded-[22px] px-4 py-4 text-left ${
                         focusedIssueId === issue.id
-                          ? 'border-[var(--brand-500)] bg-[var(--surface-strong)] text-[var(--ink-950)]'
-                          : 'border-[var(--border-soft)] bg-[var(--surface-muted)] text-[var(--ink-800)]'
+                          ? 'executive-card executive-highlight'
+                          : 'executive-card'
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="font-semibold">{issue.title}</div>
-                        <StatusPill tone={issue.severity}>
-                          {issue.severity === 'low' ? 'Низкий' : 'Нужно подтвердить'}
-                        </StatusPill>
+                      <div className="relative">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="font-semibold text-[var(--ink-950)]">{issue.title}</div>
+                          <StatusPill tone={issue.severity}>
+                            {issue.severity === 'low' ? 'Низкий приоритет' : 'Нужна проверка'}
+                          </StatusPill>
+                        </div>
+                        <div className="mt-2 text-sm leading-7 text-[var(--ink-800)]">
+                          {issue.summary}
+                        </div>
                       </div>
-                      <div className="mt-2 text-sm leading-7">{issue.summary}</div>
                     </button>
                   ))
               ) : (
-                <div className="rounded-[22px] border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] px-4 py-4 text-sm text-[var(--ink-700)]">
-                  Пока пусто.
+                <div className="surface-dashed mt-4 rounded-[22px] px-4 py-4 text-sm text-[var(--ink-700)]">
+                  Пусто.
                 </div>
               )}
             </div>
@@ -210,7 +231,7 @@ export function DraftPage() {
           <Panel className="rounded-[32px] p-5">
             <div className="flex items-center gap-2">
               <Link2 size={17} className="text-[var(--brand-700)]" />
-              <div className="font-semibold text-[var(--ink-950)]">Источники и обоснования</div>
+              <div className="font-semibold text-[var(--ink-950)]">Источники и обоснование</div>
             </div>
             <div className="mt-4 space-y-3">
               {hasDemoVariant ? (
@@ -220,20 +241,24 @@ export function DraftPage() {
                     <button
                       key={source.id}
                       onClick={() => openSectionFromSource(source.relatedSectionId)}
-                      className="w-full rounded-[22px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-4 text-left transition hover:border-[var(--border-strong)]"
+                      className="executive-card w-full rounded-[22px] px-4 py-4 text-left"
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="font-semibold text-[var(--ink-950)]">{source.label}</div>
-                        <StatusPill tone={source.confidence === 'high' ? 'ready' : 'attention'}>
-                          {formatConfidence(source.confidence)}
-                        </StatusPill>
+                      <div className="relative">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="font-semibold text-[var(--ink-950)]">{source.label}</div>
+                          <StatusPill tone={source.confidence === 'high' ? 'ready' : 'attention'}>
+                            {formatConfidence(source.confidence)}
+                          </StatusPill>
+                        </div>
+                        <div className="mt-2 text-sm leading-7 text-[var(--ink-800)]">
+                          {source.excerpt}
+                        </div>
                       </div>
-                      <div className="mt-2 text-sm leading-7 text-[var(--ink-800)]">{source.excerpt}</div>
                     </button>
                   ))
               ) : (
-                <div className="rounded-[22px] border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] px-4 py-4 text-sm text-[var(--ink-700)]">
-                  Пока пусто.
+                <div className="surface-dashed rounded-[22px] px-4 py-4 text-sm text-[var(--ink-700)]">
+                  Пусто.
                 </div>
               )}
             </div>
@@ -241,7 +266,7 @@ export function DraftPage() {
 
           <Link
             to={exportPath(activeBranch, demoCase.exportId)}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--brand-600)] px-4 py-3 text-sm font-semibold text-slate-950"
+            className={`${buttonStyles('primary')} w-full px-4 py-3 text-sm`}
           >
             Перейти к экспорту
             <ArrowRight size={16} />

@@ -20,7 +20,8 @@ export function DashboardPage() {
 
   const anchorCase = cases.find((demoCase) => demoCase.isAnchor) ?? cases[0]
   const activeBranchLabel = useMemo(
-    () => (pendingBranch === 'kp' ? 'Коммерческое предложение' : 'Техническое задание'),
+    () =>
+      pendingBranch === 'kp' ? 'Коммерческое предложение' : 'Техническое задание',
     [pendingBranch],
   )
   const sidebarBranch = branchLaunch[selectedDocumentType].started
@@ -59,12 +60,14 @@ export function DashboardPage() {
   return (
     <div className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-[-8%] top-[-4%] h-72 w-72 rounded-full bg-[rgba(78,149,188,0.2)] blur-3xl" />
-        <div className="absolute right-[-6%] top-20 h-80 w-80 rounded-full bg-[rgba(213,159,78,0.14)] blur-3xl" />
-        <div className="paper-grid absolute inset-0 opacity-45" />
+        <div className="ambient-orb ambient-orb-cyan absolute left-[-8%] top-[-4%] h-[22rem] w-[22rem] animate-[ambient-float_14s_ease-in-out_infinite]" />
+        <div className="ambient-orb ambient-orb-gold absolute right-[-6%] top-20 h-[24rem] w-[24rem] animate-[ambient-float_16s_ease-in-out_infinite]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(199,155,88,0.08),transparent_34%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,248,234,0.04),transparent_20%,transparent_84%,rgba(255,248,234,0.018))]" />
+        <div className="paper-grid absolute inset-0 opacity-35" />
       </div>
 
-      <div className="relative mx-auto flex min-h-screen w-full max-w-[1600px] gap-4 px-4 py-4 md:px-6">
+      <div className="relative mx-auto flex min-h-screen w-full max-w-[1600px] gap-5 px-4 py-4 md:px-6">
         <div className="hidden w-[332px] shrink-0 xl:block">
           <WorkspaceSidebar
             branch={sidebarBranch}
@@ -82,30 +85,42 @@ export function DashboardPage() {
             transition={{ duration: 0.45, ease: 'easeOut' }}
             className="w-full space-y-8"
           >
-            <div className="mx-auto max-w-3xl text-center">
+            <div className="mx-auto max-w-4xl text-center">
               <Eyebrow>Экран 1</Eyebrow>
-              <h1 className="mt-5 text-4xl font-semibold tracking-tight text-[var(--ink-950)] md:text-6xl">
+              <h1 className="display-title mt-5 text-5xl text-[var(--ink-950)] md:text-7xl">
                 С чего начинаем: КП или ТЗ?
               </h1>
+              <p className="mt-5 text-base leading-8 text-[var(--ink-800)] md:text-lg">
+                Выберите ветку работы и запустите демонстрационный пайплайн в оформлении
+                приватного ИИ-рабочего пространства.
+              </p>
             </div>
 
             <div className="grid gap-6 xl:grid-cols-2">
-              <Panel className="rounded-[36px] p-7 md:p-8">
+              <Panel tone="highlight" className="rounded-[36px] p-7 md:p-8">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="rounded-[24px] bg-[rgba(78,149,188,0.16)] p-4 text-[var(--brand-700)]">
+                  <div className="accent-icon-block rounded-[24px] p-4">
                     <FileSpreadsheet size={30} />
                   </div>
-                  <div className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-2 text-sm text-[var(--ink-700)]">
+                  <div className="metal-pill rounded-full px-4 py-2 text-sm text-[var(--ink-700)]">
                     Ветка для коммерции
                   </div>
                 </div>
 
-                <h2 className="mt-6 text-3xl font-semibold text-[var(--ink-950)]">
+                <h2 className="display-section-title mt-6 text-4xl text-[var(--ink-950)]">
                   Коммерческое предложение
                 </h2>
+                <p className="mt-3 max-w-xl text-sm leading-7 text-[var(--ink-800)]">
+                  Витрина для коммерческого сценария с номенклатурой, ценами и премиальной
+                  подачей финального результата.
+                </p>
+
                 {branchLaunch.kp.started ? (
-                  <div className="mt-5 rounded-[22px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-700)]">
-                    Текущий пайплайн: <span className="font-semibold text-[var(--ink-950)]">{branchLaunch.kp.pipelineName}</span>
+                  <div className="surface-note mt-5 rounded-[22px] px-4 py-3 text-sm text-[var(--ink-700)]">
+                    Текущий пайплайн:{' '}
+                    <span className="font-semibold text-[var(--ink-950)]">
+                      {branchLaunch.kp.pipelineName}
+                    </span>
                   </div>
                 ) : null}
 
@@ -118,22 +133,30 @@ export function DashboardPage() {
                 </button>
               </Panel>
 
-              <Panel className="rounded-[36px] p-7 md:p-8">
+              <Panel tone="gold" className="rounded-[36px] p-7 md:p-8">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="rounded-[24px] bg-[rgba(213,159,78,0.16)] p-4 text-[var(--accent-amber-strong)]">
+                  <div className="accent-icon-block rounded-[24px] p-4 text-[var(--accent-amber-strong)]">
                     <FileText size={30} />
                   </div>
-                  <div className="rounded-full border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-2 text-sm text-[var(--ink-700)]">
+                  <div className="metal-pill rounded-full px-4 py-2 text-sm text-[var(--ink-700)]">
                     Ветка для техзадания
                   </div>
                 </div>
 
-                <h2 className="mt-6 text-3xl font-semibold text-[var(--ink-950)]">
+                <h2 className="display-section-title mt-6 text-4xl text-[var(--ink-950)]">
                   Техническое задание
                 </h2>
+                <p className="mt-3 max-w-xl text-sm leading-7 text-[var(--ink-800)]">
+                  Инженерная ветка с нормами, измерениями и строгой документной логикой для
+                  демонстрации зрелости решения.
+                </p>
+
                 {branchLaunch.tz.started ? (
-                  <div className="mt-5 rounded-[22px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-700)]">
-                    Текущий пайплайн: <span className="font-semibold text-[var(--ink-950)]">{branchLaunch.tz.pipelineName}</span>
+                  <div className="surface-note mt-5 rounded-[22px] px-4 py-3 text-sm text-[var(--ink-700)]">
+                    Текущий пайплайн:{' '}
+                    <span className="font-semibold text-[var(--ink-950)]">
+                      {branchLaunch.tz.pipelineName}
+                    </span>
                   </div>
                 ) : null}
 
@@ -151,18 +174,20 @@ export function DashboardPage() {
       </div>
 
       {pendingBranch ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(4,10,15,0.72)] px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-[28px] border border-[var(--border-soft)] bg-[var(--surface-strong)] p-6 shadow-[var(--shadow-soft)]">
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="frosted panel-outline w-full max-w-md rounded-[30px] p-6 shadow-[var(--shadow-soft)]">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--ink-500)]">
                   Новый пайплайн
                 </div>
-                <h3 className="mt-2 text-2xl font-semibold text-[var(--ink-950)]">{activeBranchLabel}</h3>
+                <h3 className="display-section-title mt-2 text-3xl text-[var(--ink-950)]">
+                  {activeBranchLabel}
+                </h3>
               </div>
               <button
                 onClick={closeStartModal}
-                className="rounded-full border border-[var(--border-soft)] p-2 text-[var(--ink-700)] transition hover:bg-[var(--surface-muted)]"
+                className="rounded-full border border-[var(--border-soft)] bg-[rgba(255,248,234,0.02)] p-2 text-[var(--ink-700)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)]"
                 aria-label="Закрыть окно"
               >
                 <X size={16} />
@@ -170,7 +195,9 @@ export function DashboardPage() {
             </div>
 
             <label className="mt-6 block">
-              <div className="text-sm font-semibold text-[var(--ink-950)]">Название пайплайна</div>
+              <div className="text-sm font-semibold text-[var(--ink-950)]">
+                Название пайплайна
+              </div>
               <input
                 autoFocus
                 value={pipelineName}
@@ -181,7 +208,7 @@ export function DashboardPage() {
                   }
                 }}
                 placeholder="Например: КП для входной зоны"
-                className="mt-3 w-full rounded-[20px] border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-950)] outline-none transition focus:border-[var(--brand-500)]"
+                className="executive-input mt-3 w-full px-4 py-3 text-sm text-[var(--ink-950)]"
               />
             </label>
 
